@@ -35,3 +35,9 @@ out/
 
 ### VS Code ###
 .vscode/
+
+# 환경별 설정파일
+.env
+application-secret.yml
+application-prod.yml
+application-local.yml
