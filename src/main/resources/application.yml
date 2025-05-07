@@ -1,15 +1,15 @@
 spring:
   datasource:
-    driver-class-name: com.mysql.cj.jdbc.Driver
     # 로컬 테스트용
-    # url: jdbc:mysql://localhost:3306/gdg
-    # username: ${LOCAL_DB_NAME}
-    # password: ${LOCAL_DB_PW}
+    url: jdbc:mysql://localhost:3306/fossistant
+    username: ${LOCAL_DB_NAME}
+    password: ${LOCAL_DB_PW}
 
-    # Azure Database for MySQL (Flexible Server) 배포용
-    url: jdbc:mysql://fossistantdb.mysql.database.azure.com:3306/fossistantdb?sslMode=REQUIRED
-    username: ${AZURE_DB_USERNAME}
-    password: ${AZURE_DB_PASSWORD}
+    # Azure Database 배포용
+  #    driver-class-name: com.mysql.cj.jdbc.Driver
+  #    url: jdbc:mysql://fossistantdb.mysql.database.azure.com:3306/fossistantdb?sslMode=REQUIRED
+  #    username: ${AZURE_DB_USERNAME}
+  #    password: ${AZURE_DB_PASSWORD}
 
   jpa:
     properties:
@@ -21,10 +21,14 @@ spring:
         hbm2ddl:
           auto: update       # ※운영 환경에서는 create → update 로만 쓰세요
         default_batch_fetch_size: 1000
-
   sql:
     init:
       mode: never
+  data:
+    redis:
+      host: localhost
+      port: 6379
+
 #jwt:
 #  secret: ${JWT_SECRET_KEY}
 #  access-token-validity: ${JWT_ACCESS_TOKEN_TIME}
