@@ -1,15 +1,15 @@
 spring:
   datasource:
     # 로컬 테스트용
-    url: jdbc:mysql://localhost:3306/fossistant
-    username: ${LOCAL_DB_NAME}
-    password: ${LOCAL_DB_PW}
+#    url: jdbc:mysql://localhost:3306/fossistant
+#    username: ${LOCAL_DB_NAME}
+#    password: ${LOCAL_DB_PW}
 
     # Azure Database 배포용
-  #    driver-class-name: com.mysql.cj.jdbc.Driver
-  #    url: jdbc:mysql://fossistantdb.mysql.database.azure.com:3306/fossistantdb?sslMode=REQUIRED
-  #    username: ${AZURE_DB_USERNAME}
-  #    password: ${AZURE_DB_PASSWORD}
+      driver-class-name: com.mysql.cj.jdbc.Driver
+      url: jdbc:mysql://fossistantdb.mysql.database.azure.com:3306/fossistantdb?sslMode=REQUIRED
+      username: ${AZURE_DB_USERNAME}
+      password: ${AZURE_DB_PASSWORD}
 
   jpa:
     properties:

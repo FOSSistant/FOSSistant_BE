@@ -6,7 +6,7 @@ import Capstone.FOSSistant.global.service.IssueListServiceImpl;
 import Capstone.FOSSistant.global.web.dto.IssueList.IssueListRequestDTO;
 import Capstone.FOSSistant.global.web.dto.IssueList.IssueListResponseDTO;
 import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.parameters.RequestBody;
+import org.springframework.web.bind.annotation.RequestBody;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.CrossOrigin;
@@ -20,7 +20,7 @@ import java.util.concurrent.CompletableFuture;
 @RestController
 @RequiredArgsConstructor
 @CrossOrigin
-@RequestMapping("/api/issues")
+@RequestMapping("/issues")
 @Tag(name = "이슈 분류 API", description = "GitHub 이슈를 AI로 난이도 분류하는 API입니다.")
 public class IssueListController {
 

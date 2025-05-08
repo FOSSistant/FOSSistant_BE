@@ -5,7 +5,11 @@ import lombok.*;
 
 import java.util.List;
 
+
 @Getter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
 public class IssueListRequestDTO {
     private List<IssueRequestDTO> issues;
 
