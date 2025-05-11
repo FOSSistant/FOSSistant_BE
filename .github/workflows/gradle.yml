@@ -69,6 +69,7 @@ jobs:
 
             echo "✅ Running new container with Azure DB..."
             sudo docker run -d --name fossistant-container -p 8080:8080 \
+              --network my-network \   
               -e SPRING_DATASOURCE_URL="jdbc:mysql://fossistantdb.mysql.database.azure.com:3306/fossistantdb?sslMode=REQUIRED" \
               -e SPRING_DATASOURCE_USERNAME="${{ secrets.AZURE_DB_USERNAME }}" \
               -e SPRING_DATASOURCE_PASSWORD="${{ secrets.AZURE_DB_PASSWORD }}" \
