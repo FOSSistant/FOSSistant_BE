@@ -6,6 +6,8 @@ import Capstone.FOSSistant.global.apiPayload.code.status.ErrorStatus;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataAccessException;
+import org.springframework.data.redis.RedisConnectionFailureException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -116,6 +118,29 @@ public class ExceptionAdvice extends ResponseEntityExceptionHandler {
                 errorCommonStatus.getHttpStatus(),
                 request
         );
+    }
+
+    @ExceptionHandler(RedisConnectionFailureException.class)
+    public ResponseEntity<Object> handleRedis(RedisConnectionFailureException e, WebRequest request) {
+        log.error("[REDIS 연결 실패]: {}", e.getMessage());
+        return buildResponse(e, ErrorStatus.REDIS_CONNECTION_FAIL, request);
+    }
+
+    @ExceptionHandler(DataAccessException.class)
+    public ResponseEntity<Object> handleDB(DataAccessException e, WebRequest request) {
+        log.error("[DB 에러]: {}", e.getMessage());
+        return buildResponse(e, ErrorStatus.DB_ERROR, request);
+    }
+
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<Object> handleUnexpected(Exception e, WebRequest request) {
+        log.error("[서버 예외]: {}", e.getMessage(), e);
+        return buildResponse(e, ErrorStatus._INTERNAL_SERVER_ERROR, request);
+    }
+
+    private ResponseEntity<Object> buildResponse(Exception e, ErrorStatus status, WebRequest request) {
+        ApiResponse<Object> body = ApiResponse.onFailure(status.getCode(), status.getMessage(), null);
+        return super.handleExceptionInternal(e, body, new HttpHeaders(), status.getHttpStatus(), request);
     }
 
 }

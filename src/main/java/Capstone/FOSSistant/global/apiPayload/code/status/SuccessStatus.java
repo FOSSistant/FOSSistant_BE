@@ -11,11 +11,13 @@ import org.springframework.http.HttpStatus;
 @AllArgsConstructor
 public enum SuccessStatus implements BaseCode {
 
-    // 예시 응답
-    EXAMPLE_OK(HttpStatus.OK, "EXAMPLE_1000", "성공입니다."),
-    // 유저 관련 응답
-    MEMBER_OK(HttpStatus.OK, "MEMBER_1000", "성공입니다."),
-    ISSUE_OK(HttpStatus.OK, "ISSUE_1000", "성공입니다.");
+    //멤버 관련
+    MEMBER_CREATED(HttpStatus.CREATED, "MEMBER_1000", "회원가입이 완료되었습니다."),
+    MEMBER_LOGIN_OK(HttpStatus.OK, "MEMBER_1001", "로그인이 완료되었습니다."),
+
+    // 이슈 관련
+    ISSUE_TAGGING_OK(HttpStatus.OK, "ISSUE_2000", "이슈 난이도 태깅 성공"),
+    ISSUE_GUIDE_OK(HttpStatus.OK, "ISSUE_2001", "이슈 해결 가이드 제공 성공");
 
     private final HttpStatus httpStatus;
     private final String code;

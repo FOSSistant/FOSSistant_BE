@@ -40,6 +40,10 @@ public enum ErrorStatus implements BaseErrorCode {
     MEMBER_EMAIL_ALREADY_EXISTS(HttpStatus.CONFLICT, "MEMBER_1009", "이미 가입된 이메일입니다."),
     MEMBER_NICKNAME_ALREADY_EXISTS(HttpStatus.CONFLICT, "MEMBER_1010", "이미 존재하는 닉네임입니다."),
 
+    //서버 에러
+    REDIS_CONNECTION_FAIL(HttpStatus.INTERNAL_SERVER_ERROR, "REDIS_5001", "Redis 연결 실패"),
+    DB_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "DB_5002", "DB 처리 중 에러 발생"),
+    EXTERNAL_API_FAIL(HttpStatus.BAD_GATEWAY, "AI_6000", "AI API 호출 실패"),
 
     ;
 

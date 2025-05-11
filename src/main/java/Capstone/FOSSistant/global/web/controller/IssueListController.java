@@ -39,7 +39,7 @@ public class IssueListController {
                 .map(CompletableFuture::join)
                 .toList();
 
-        return ApiResponse.onSuccess(SuccessStatus.ISSUE_OK,
+        return ApiResponse.onSuccess(SuccessStatus.ISSUE_TAGGING_OK,
                 IssueListResponseDTO.builder().results(results).build());
     }
 }
