@@ -20,7 +20,7 @@ public class IssueListResponseDTO {
     @AllArgsConstructor
     @Builder
     public static class IssueResponseDTO {
-        private String id;
+        private String issueId;
         private String difficulty;
     }
 }

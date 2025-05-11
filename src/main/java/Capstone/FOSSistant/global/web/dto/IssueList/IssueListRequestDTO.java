@@ -18,7 +18,7 @@ public class IssueListRequestDTO {
     @AllArgsConstructor(access = AccessLevel.PROTECTED)
     @NoArgsConstructor(access = AccessLevel.PROTECTED)
     public static class IssueRequestDTO{
-        String id;
+        String issueId;
         String title;
         String body;
     }
