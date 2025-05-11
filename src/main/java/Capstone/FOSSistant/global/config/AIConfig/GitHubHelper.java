@@ -8,6 +8,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.ArrayList;
@@ -21,13 +22,25 @@ public class GitHubHelper {
     private final String GITHUB_API = "https://api.github.com/repos/";
 
     public String fetchReadme(String owner, String repo) {
-        String url = GITHUB_API + owner + "/" + repo + "/readme";
-        HttpHeaders headers = new HttpHeaders();
-        headers.set("Accept", "application/vnd.github.v3.raw");
-        HttpEntity<Void> entity = new HttpEntity<>(headers);
+        try {
+            String url = "https://api.github.com/repos/" + owner + "/" + repo + "/readme";
+            HttpHeaders headers = new HttpHeaders();
+            headers.set("Accept", "application/vnd.github.v3.raw");
+            HttpEntity<Void> entity = new HttpEntity<>(headers);
 
-        ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.GET, entity, String.class);
-        return response.getBody();
+            ResponseEntity<String> response = restTemplate.exchange(
+                    url,
+                    HttpMethod.GET,
+                    entity,
+                    String.class
+            );
+            return response.getBody();
+        } catch (HttpClientErrorException.NotFound e) {
+            // README가 없을 경우 빈 값 반환
+            return "";
+        } catch (Exception e) {
+            throw new RuntimeException("README 가져오기 실패", e);
+        }
     }
 
     public String fetchRepoStructure(String owner, String repo) {
