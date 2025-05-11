@@ -8,7 +8,7 @@ import Capstone.FOSSistant.global.web.dto.IssueList.IssueListResponseDTO;
 public class IssueListConverter {
     public static IssueList toEntity(IssueListRequestDTO.IssueRequestDTO dto, Tag difficulty) {
         return IssueList.builder()
-                .id(dto.getId())
+                .id(dto.getIssueId())
                 .title(dto.getTitle())
                 .body(dto.getBody())
                 .difficulty(difficulty)
@@ -17,7 +17,7 @@ public class IssueListConverter {
 
     public static IssueListResponseDTO.IssueResponseDTO toResponseDTO(String id, Tag difficulty) {
         return IssueListResponseDTO.IssueResponseDTO.builder()
-                .id(id)
+                .issueId(id)
                 .difficulty(difficulty.name().toLowerCase())
                 .build();
     }

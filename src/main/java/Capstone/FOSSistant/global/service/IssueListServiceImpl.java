@@ -25,7 +25,7 @@ public class IssueListServiceImpl implements IssueListService {
 
     @Override
     public CompletableFuture<IssueListResponseDTO.IssueResponseDTO> classify(IssueListRequestDTO.IssueRequestDTO dto) {
-        String redisKey = "issue:" + dto.getId();
+        String redisKey = "issue:" + dto.getIssueId();
         Tag difficulty;
 
         try {
@@ -54,7 +54,7 @@ public class IssueListServiceImpl implements IssueListService {
         }
 
         return CompletableFuture.completedFuture(
-                IssueListConverter.toResponseDTO(dto.getId(), difficulty)
+                IssueListConverter.toResponseDTO(dto.getIssueId(), difficulty)
         );
     }
 
