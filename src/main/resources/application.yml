@@ -28,6 +28,10 @@ spring:
     redis:
       host: localhost
       port: 6379
+  gemini:
+    api-key: ${GEMINI_KEY}
+    chat:
+      model: gemini-2.0-flash
 
 #jwt:
 #  secret: ${JWT_SECRET_KEY}
