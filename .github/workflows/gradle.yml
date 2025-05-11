@@ -73,6 +73,6 @@ jobs:
               -e SPRING_DATASOURCE_USERNAME="${{ secrets.AZURE_DB_USERNAME }}" \
               -e SPRING_DATASOURCE_PASSWORD="${{ secrets.AZURE_DB_PASSWORD }}" \
               -e SPRING_GEMINI_API_KEY="${{ secrets.GEMINI_KEY }}" \
-              -e SPRING_REDIS_HOST="localhost" \
+              -e SPRING_REDIS_HOST="redis" \
               -e SPRING_REDIS_PORT="6379" \
               ${{ secrets.DOCKER_USERNAME }}/fossistant:latest
