@@ -31,15 +31,19 @@ public class IssueListController {
     public ApiResponse<IssueListResponseDTO> classifyIssues(
             @RequestBody IssueListRequestDTO requestDTO) {
 
-        List<CompletableFuture<IssueListResponseDTO.IssueResponseDTO>> futures = requestDTO.getIssues().stream()
-                .map(issueListService::classify)
-                .toList();
+        try {
+            List<CompletableFuture<IssueListResponseDTO.IssueResponseDTO>> futures = requestDTO.getIssues().stream()
+                    .map(issueListService::classify)
+                    .toList();
 
-        List<IssueListResponseDTO.IssueResponseDTO> results = futures.stream()
-                .map(CompletableFuture::join)
-                .toList();
+            List<IssueListResponseDTO.IssueResponseDTO> results = futures.stream()
+                    .map(CompletableFuture::join)
+                    .toList();
 
-        return ApiResponse.onSuccess(SuccessStatus.ISSUE_TAGGING_OK,
-                IssueListResponseDTO.builder().results(results).build());
+            return ApiResponse.onSuccess(SuccessStatus.ISSUE_TAGGING_OK,
+                    IssueListResponseDTO.builder().results(results).build());
+        } catch (Exception e) {
+            throw new RuntimeException("이슈 분류 중 서버 에러 발생", e);
+        }
     }
 }

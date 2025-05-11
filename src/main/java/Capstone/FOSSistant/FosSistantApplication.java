@@ -10,6 +10,7 @@ public class FosSistantApplication {
 
 	public static void main(String[] args) {
 		SpringApplication.run(FosSistantApplication.class, args);
+		System.out.println("[FosSistantApplication started]");
 	}
 
 }

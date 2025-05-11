@@ -132,12 +132,6 @@ public class ExceptionAdvice extends ResponseEntityExceptionHandler {
         return buildResponse(e, ErrorStatus.DB_ERROR, request);
     }
 
-    @ExceptionHandler(Exception.class)
-    public ResponseEntity<Object> handleUnexpected(Exception e, WebRequest request) {
-        log.error("[서버 예외]: {}", e.getMessage(), e);
-        return buildResponse(e, ErrorStatus._INTERNAL_SERVER_ERROR, request);
-    }
-
     private ResponseEntity<Object> buildResponse(Exception e, ErrorStatus status, WebRequest request) {
         ApiResponse<Object> body = ApiResponse.onFailure(status.getCode(), status.getMessage(), null);
         return super.handleExceptionInternal(e, body, new HttpHeaders(), status.getHttpStatus(), request);
