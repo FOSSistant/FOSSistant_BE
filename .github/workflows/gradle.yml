@@ -60,16 +60,23 @@ jobs:
           key: ${{ secrets.SSH_KEY }}
           port: 22
           script: |
-            echo "✅ Stopping old container..."
+            echo "✅ Creating Docker network (if not exists)..."
+            sudo docker network create my-network || true
+
+            echo "✅ Starting Redis container..."
+            sudo docker rm -f redis || true
+            sudo docker run -d --name redis --network my-network redis
+
+            echo "✅ Stopping old application container..."
             sudo docker stop fossistant-container || true
             sudo docker rm fossistant-container || true
 
-            echo "✅ Pulling latest image..."
+            echo "✅ Pulling latest application image..."
             sudo docker pull ${{ secrets.DOCKER_USERNAME }}/fossistant:latest
 
-            echo "✅ Running new container with Azure DB..."
+            echo "✅ Starting application container..."
             sudo docker run -d --name fossistant-container -p 8080:8080 \
-              --network my-network \   
+              --network my-network \
               -e SPRING_DATASOURCE_URL="jdbc:mysql://fossistantdb.mysql.database.azure.com:3306/fossistantdb?sslMode=REQUIRED" \
               -e SPRING_DATASOURCE_USERNAME="${{ secrets.AZURE_DB_USERNAME }}" \
               -e SPRING_DATASOURCE_PASSWORD="${{ secrets.AZURE_DB_PASSWORD }}" \
