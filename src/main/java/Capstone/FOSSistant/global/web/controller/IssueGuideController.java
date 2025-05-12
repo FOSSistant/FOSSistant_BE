@@ -19,9 +19,11 @@ public class IssueGuideController {
     private final GeminiGuideService geminiGuideService;
 
     @PostMapping("/guide")
-    @Operation(summary = "이슈 가이드 생성", description = "이슈 정보로부터 레포지토리 분석 및 가이드 생성")
+    @Operation(summary = "이슈 가이드 생성", description = "이슈 URL로부터 title/body/readme 구조를 추출하여 가이드 생성")
     public ApiResponse<IssueGuideResponseDTO> getGuide(@RequestBody IssueGuideRequestDTO request) {
-        return ApiResponse.onSuccess(SuccessStatus.ISSUE_GUIDE_OK,
-                geminiGuideService.generateGuide(request.getIssueId(), request.getTitle(), request.getBody()));
+        return ApiResponse.onSuccess(
+                SuccessStatus.ISSUE_GUIDE_OK,
+                geminiGuideService.generateGuide(request.getIssueId())
+        );
     }
 }

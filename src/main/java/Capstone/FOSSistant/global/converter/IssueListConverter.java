@@ -9,8 +9,6 @@ public class IssueListConverter {
     public static IssueList toEntity(IssueListRequestDTO.IssueRequestDTO dto, Tag difficulty) {
         return IssueList.builder()
                 .id(dto.getIssueId())
-                .title(dto.getTitle())
-                .body(dto.getBody())
                 .difficulty(difficulty)
                 .build();
     }

@@ -16,12 +16,6 @@ public class IssueList extends BaseEntity {
     @Id
     private String id;
 
-    @Column(nullable = false)
-    private String title;
-
-    @Lob
-    private String body;
-
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private Tag difficulty;

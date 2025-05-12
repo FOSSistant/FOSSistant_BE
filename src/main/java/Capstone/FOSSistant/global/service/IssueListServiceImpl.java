@@ -1,5 +1,6 @@
 package Capstone.FOSSistant.global.service;
 
+import Capstone.FOSSistant.global.config.GitHubHelper;
 import Capstone.FOSSistant.global.converter.IssueListConverter;
 import Capstone.FOSSistant.global.domain.enums.Tag;
 import Capstone.FOSSistant.global.repository.IssueListRepository;
@@ -22,6 +23,7 @@ public class IssueListServiceImpl implements IssueListService {
 
     private final IssueListRepository issueListRepository;
     private final StringRedisTemplate redisTemplate;
+    private final GitHubHelper githubHelper;
 
     @Override
     public CompletableFuture<IssueListResponseDTO.IssueResponseDTO> classify(IssueListRequestDTO.IssueRequestDTO dto) {
@@ -34,7 +36,7 @@ public class IssueListServiceImpl implements IssueListService {
                 difficulty = Tag.valueOf(cached.toUpperCase());
                 log.info("캐시 조회 성공: {}", redisKey);
             } else {
-                difficulty = safeClassify(dto);
+                difficulty = safeClassify(dto.getIssueId());
                 try {
                     redisTemplate.opsForValue().set(redisKey, difficulty.name().toLowerCase(), Duration.ofDays(7));
                     log.info("캐시 저장 완료: {}", redisKey);
@@ -58,17 +60,28 @@ public class IssueListServiceImpl implements IssueListService {
         );
     }
 
-    private Tag safeClassify(IssueListRequestDTO.IssueRequestDTO dto) {
+    private Tag safeClassify(String issueUrl) {
         try {
-            return dummyClassify(dto); // 실제 AI 로직으로 대체 예정
+            // 이슈 URL → owner, repo, issueNumber 추출
+            String[] parts = issueUrl.split("/");
+            String owner = parts[3];
+            String repo = parts[4];
+            String issueNumber = parts[6];
+
+            // GitHub API로 title/body 가져오기
+            String title = githubHelper.fetchIssueTitle(owner, repo, issueNumber);
+            String body = githubHelper.fetchIssueBody(owner, repo, issueNumber);
+
+            return dummyClassify(title, body);
+
         } catch (Exception e) {
             log.warn("분류 실패: {}", e.getMessage());
             return Tag.UNKNOWN;
         }
     }
 
-    private Tag dummyClassify(IssueListRequestDTO.IssueRequestDTO dto) {
-        if (dto.getTitle().toLowerCase().contains("fix") || dto.getBody().length() > 300) {
+    public Tag dummyClassify(String title, String body) {
+        if (title.toLowerCase().contains("fix") || body.length() > 300) {
             return Tag.HARD;
         } else {
             return Tag.EASY;
