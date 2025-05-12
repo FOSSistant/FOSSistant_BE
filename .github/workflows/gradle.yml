@@ -83,4 +83,5 @@ jobs:
               -e SPRING_GEMINI_API_KEY="${{ secrets.GEMINI_KEY }}" \
               -e SPRING_REDIS_HOST="redis" \
               -e SPRING_REDIS_PORT="6379" \
+              -e SPRING_GITHUB_TOKEN="${{ secrets.HUB_TOKEN }}" \
               ${{ secrets.DOCKER_USERNAME }}/fossistant:latest
