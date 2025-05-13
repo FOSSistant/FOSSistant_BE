@@ -27,7 +27,7 @@ spring:
 
   data:
     redis:
-      host: redis # ※운영 환경에서는 localhost → redis
+      host: localhost # ※운영 환경에서는 localhost → redis
       port: 6379
 
   gemini:

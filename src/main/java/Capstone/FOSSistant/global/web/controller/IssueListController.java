@@ -6,6 +6,7 @@ import Capstone.FOSSistant.global.service.IssueListServiceImpl;
 import Capstone.FOSSistant.global.web.dto.IssueList.IssueListRequestDTO;
 import Capstone.FOSSistant.global.web.dto.IssueList.IssueListResponseDTO;
 import io.swagger.v3.oas.annotations.Operation;
+import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.RequestBody;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -29,21 +30,16 @@ public class IssueListController {
     @PostMapping
     @Operation(summary = "이슈 AI 분류", description = "여러 개의 GitHub 이슈에 대해 AI 기반 난이도 분류 수행")
     public ApiResponse<IssueListResponseDTO> classifyIssues(
-            @RequestBody IssueListRequestDTO requestDTO) {
+            @RequestBody @Valid IssueListRequestDTO requestDTO) {
+        List<CompletableFuture<IssueListResponseDTO.IssueResponseDTO>> futures = requestDTO.getIssues().stream()
+                .map(issueListService::classify)
+                .toList();
 
-        try {
-            List<CompletableFuture<IssueListResponseDTO.IssueResponseDTO>> futures = requestDTO.getIssues().stream()
-                    .map(issueListService::classify)
-                    .toList();
+        List<IssueListResponseDTO.IssueResponseDTO> results = futures.stream()
+                .map(CompletableFuture::join)
+                .toList();
 
-            List<IssueListResponseDTO.IssueResponseDTO> results = futures.stream()
-                    .map(CompletableFuture::join)
-                    .toList();
-
-            return ApiResponse.onSuccess(SuccessStatus.ISSUE_TAGGING_OK,
-                    IssueListResponseDTO.builder().results(results).build());
-        } catch (Exception e) {
-            throw new RuntimeException("이슈 분류 중 서버 에러 발생", e);
-        }
+        return ApiResponse.onSuccess(SuccessStatus.ISSUE_TAGGING_OK,
+                IssueListResponseDTO.builder().results(results).build());
     }
 }
