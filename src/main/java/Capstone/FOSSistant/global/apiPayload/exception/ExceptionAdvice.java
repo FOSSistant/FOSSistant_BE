@@ -10,6 +10,7 @@ import org.springframework.dao.DataAccessException;
 import org.springframework.data.redis.RedisConnectionFailureException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -22,6 +23,7 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExcep
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.CompletionException;
 
 @Slf4j
 @RestControllerAdvice(annotations = {RestController.class})
@@ -39,9 +41,9 @@ public class ExceptionAdvice extends ResponseEntityExceptionHandler {
     }
 
 
-    //@org.springframework.web.bind.annotation.ExceptionHandler
+    @Override
     public ResponseEntity<Object> handleMethodArgumentNotValid(
-            MethodArgumentNotValidException e, HttpHeaders headers, HttpStatus status, WebRequest request) {
+            MethodArgumentNotValidException e, HttpHeaders headers, HttpStatusCode status, WebRequest request) {
 
         Map<String, String> errors = new LinkedHashMap<>();
 
@@ -120,21 +122,33 @@ public class ExceptionAdvice extends ResponseEntityExceptionHandler {
         );
     }
 
-    @ExceptionHandler(RedisConnectionFailureException.class)
-    public ResponseEntity<Object> handleRedis(RedisConnectionFailureException e, WebRequest request) {
-        log.error("[REDIS 연결 실패]: {}", e.getMessage());
-        return buildResponse(e, ErrorStatus.REDIS_CONNECTION_FAIL, request);
-    }
-
-    @ExceptionHandler(DataAccessException.class)
-    public ResponseEntity<Object> handleDB(DataAccessException e, WebRequest request) {
-        log.error("[DB 에러]: {}", e.getMessage());
-        return buildResponse(e, ErrorStatus.DB_ERROR, request);
-    }
-
     private ResponseEntity<Object> buildResponse(Exception e, ErrorStatus status, WebRequest request) {
         ApiResponse<Object> body = ApiResponse.onFailure(status.getCode(), status.getMessage(), null);
         return super.handleExceptionInternal(e, body, new HttpHeaders(), status.getHttpStatus(), request);
+    }
+
+    @ExceptionHandler(CompletionException.class)
+    public ResponseEntity<Object> handleCompletionException(CompletionException e, WebRequest request) {
+        Throwable cause = e.getCause();
+
+        if (cause instanceof GeneralException generalException) {
+            return handleExceptionInternal(
+                    generalException,
+                    generalException.getErrorReasonHttpStatus(),
+                    new HttpHeaders(),
+                    ((ServletWebRequest) request).getRequest()
+            );
+        }
+
+        log.error("비동기 예외 처리 실패: {}", cause.getMessage(), cause);
+        return handleExceptionInternalFalse(
+                e,
+                ErrorStatus._INTERNAL_SERVER_ERROR,
+                HttpHeaders.EMPTY,
+                ErrorStatus._INTERNAL_SERVER_ERROR.getHttpStatus(),
+                request,
+                cause.getMessage()
+        );
     }
 
 }

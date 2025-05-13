@@ -1,7 +1,10 @@
-package Capstone.FOSSistant.global.config;
+package Capstone.FOSSistant.global.service;
 
+import Capstone.FOSSistant.global.apiPayload.code.status.ErrorStatus;
+import Capstone.FOSSistant.global.apiPayload.exception.GithubApiException;
 import com.fasterxml.jackson.databind.JsonNode;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
 import org.springframework.stereotype.Component;
@@ -11,9 +14,10 @@ import org.springframework.web.client.RestTemplate;
 import java.util.ArrayList;
 import java.util.List;
 
+@Slf4j
 @Component
 @RequiredArgsConstructor
-public class GitHubHelper {
+public class GitHubHelperService {
 
     private final RestTemplate restTemplate = new RestTemplate();
 
@@ -39,7 +43,7 @@ public class GitHubHelper {
         } catch (HttpClientErrorException.NotFound e) {
             return ""; // README 없음
         } catch (Exception e) {
-            throw new RuntimeException("README 요청 실패: " + e.getMessage(), e);
+            throw new GithubApiException(ErrorStatus.GITHUB_API_FAIL);
         }
     }
 
@@ -65,7 +69,7 @@ public class GitHubHelper {
             return String.join("\n", paths);
 
         } catch (Exception e) {
-            throw new RuntimeException("Repo 구조 요청 실패: " + e.getMessage(), e);
+            throw new GithubApiException(ErrorStatus.GITHUB_API_FAIL);
         }
     }
 
@@ -94,7 +98,8 @@ public class GitHubHelper {
             );
             return response.getBody();
         } catch (Exception e) {
-            throw new RuntimeException("이슈 정보 요청 실패: " + e.getMessage(), e);
+            log.warn(e.getMessage());
+            throw new GithubApiException(ErrorStatus.GITHUB_API_FAIL);
         }
     }
 

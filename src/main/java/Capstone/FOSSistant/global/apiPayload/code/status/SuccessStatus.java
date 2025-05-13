@@ -16,8 +16,8 @@ public enum SuccessStatus implements BaseCode {
     MEMBER_LOGIN_OK(HttpStatus.OK, "MEMBER_1001", "로그인이 완료되었습니다."),
 
     // 이슈 관련
-    ISSUE_TAGGING_OK(HttpStatus.OK, "ISSUE_2000", "이슈 난이도 태깅 성공"),
-    ISSUE_GUIDE_OK(HttpStatus.OK, "ISSUE_2001", "이슈 해결 가이드 제공 성공");
+    ISSUE_TAGGING_OK(HttpStatus.OK, "ISSUE_200_001", "이슈 난이도 태깅 성공"),
+    ISSUE_GUIDE_OK(HttpStatus.OK, "ISSUE_200_002", "이슈 해결 가이드 제공 성공");
 
     private final HttpStatus httpStatus;
     private final String code;

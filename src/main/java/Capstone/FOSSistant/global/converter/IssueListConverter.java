@@ -4,7 +4,10 @@ import Capstone.FOSSistant.global.domain.entity.IssueList;
 import Capstone.FOSSistant.global.domain.enums.Tag;
 import Capstone.FOSSistant.global.web.dto.IssueList.IssueListRequestDTO;
 import Capstone.FOSSistant.global.web.dto.IssueList.IssueListResponseDTO;
+import org.springframework.stereotype.Component;
 
+
+@Component
 public class IssueListConverter {
     public static IssueList toEntity(IssueListRequestDTO.IssueRequestDTO dto, Tag difficulty) {
         return IssueList.builder()

@@ -1,6 +1,9 @@
 package Capstone.FOSSistant.global.service;
 
-import Capstone.FOSSistant.global.config.GitHubHelper;
+import Capstone.FOSSistant.global.apiPayload.code.status.ErrorStatus;
+import Capstone.FOSSistant.global.apiPayload.exception.ClassificationException;
+import Capstone.FOSSistant.global.apiPayload.exception.GithubApiException;
+import Capstone.FOSSistant.global.apiPayload.exception.RedisConnectionException;
 import Capstone.FOSSistant.global.converter.IssueListConverter;
 import Capstone.FOSSistant.global.domain.enums.Tag;
 import Capstone.FOSSistant.global.repository.IssueListRepository;
@@ -9,11 +12,14 @@ import Capstone.FOSSistant.global.web.dto.IssueList.IssueListResponseDTO;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataAccessException;
+import org.springframework.data.redis.RedisConnectionFailureException;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
+
 
 @Slf4j
 @Service
@@ -23,41 +29,48 @@ public class IssueListServiceImpl implements IssueListService {
 
     private final IssueListRepository issueListRepository;
     private final StringRedisTemplate redisTemplate;
-    private final GitHubHelper githubHelper;
+    private final GitHubHelperService githubHelperService;
+    private final IssueListConverter issueListConverter;
 
     @Override
     public CompletableFuture<IssueListResponseDTO.IssueResponseDTO> classify(IssueListRequestDTO.IssueRequestDTO dto) {
-        String redisKey = "issue:" + dto.getIssueId();
-        Tag difficulty;
+        return CompletableFuture.supplyAsync(() -> {
+            String key = "issue:" + dto.getIssueId();
+            Tag difficulty;
 
-        try {
-            String cached = redisTemplate.opsForValue().get(redisKey);
-            if (cached != null) {
-                difficulty = Tag.valueOf(cached.toUpperCase());
-                log.info("캐시 조회 성공: {}", redisKey);
-            } else {
-                difficulty = safeClassify(dto.getIssueId());
-                try {
-                    redisTemplate.opsForValue().set(redisKey, difficulty.name().toLowerCase(), Duration.ofDays(7));
-                    log.info("캐시 저장 완료: {}", redisKey);
-                } catch (Exception e) {
-                    log.warn("캐시 저장 실패: {}", e.getMessage());
+            // Redis 조회
+            try {
+                String cached = redisTemplate.opsForValue().get(key);
+                if (cached != null) {
+                    log.info("캐시 히트: {}", key);
+                    return issueListConverter.toResponseDTO(dto.getIssueId(),
+                            Tag.valueOf(cached.toUpperCase()));
                 }
-
-                try {
-                    issueListRepository.save(IssueListConverter.toEntity(dto, difficulty));
-                } catch (Exception e) {
-                    log.warn("DB 저장 실패: {}", e.getMessage());
-                }
+            } catch (RedisConnectionFailureException e) {
+                log.warn("Redis 장애—폴백: {}", e.getMessage());
+                throw new RedisConnectionException(ErrorStatus.REDIS_CONNECTION_FAIL);
             }
-        } catch (Exception e) {
-            log.error("예외 발생, fallback 처리: {}", e.getMessage());
-            difficulty = Tag.UNKNOWN;
-        }
 
-        return CompletableFuture.completedFuture(
-                IssueListConverter.toResponseDTO(dto.getIssueId(), difficulty)
-        );
+            //실제 분류
+            difficulty = safeClassify(dto.getIssueId());
+
+            // 캐시 저장
+            try {
+                redisTemplate.opsForValue().set(key, difficulty.name().toLowerCase(), Duration.ofDays(7));
+            } catch (RedisConnectionFailureException e) {
+                log.warn("Redis 저장 실패: {}", e.getMessage());
+            }
+
+            // DB 저장
+            try {
+                var result = issueListConverter.toEntity(dto,difficulty);
+                issueListRepository.save(result);
+            } catch (DataAccessException e) {
+                log.warn("DB 저장 실패: {}", e.getMessage());
+            }
+
+            return issueListConverter.toResponseDTO(dto.getIssueId(), difficulty);
+        });
     }
 
     private Tag safeClassify(String issueUrl) {
@@ -69,14 +82,17 @@ public class IssueListServiceImpl implements IssueListService {
             String issueNumber = parts[6];
 
             // GitHub API로 title/body 가져오기
-            String title = githubHelper.fetchIssueTitle(owner, repo, issueNumber);
-            String body = githubHelper.fetchIssueBody(owner, repo, issueNumber);
+            String title = githubHelperService.fetchIssueTitle(owner, repo, issueNumber);
+            String body = githubHelperService.fetchIssueBody(owner, repo, issueNumber);
 
             return dummyClassify(title, body);
 
+        } catch (GithubApiException e) {
+            log.warn("GitHub API 호출 실패: {}", e.getMessage());
+            throw e;
         } catch (Exception e) {
-            log.warn("분류 실패: {}", e.getMessage());
-            return Tag.UNKNOWN;
+            log.error("AI 분류 실패 {}", e.getMessage());
+            throw new ClassificationException(ErrorStatus.AI_API_FAIL);
         }
     }
 

@@ -41,10 +41,10 @@ public enum ErrorStatus implements BaseErrorCode {
     MEMBER_NICKNAME_ALREADY_EXISTS(HttpStatus.CONFLICT, "MEMBER_1010", "이미 존재하는 닉네임입니다."),
 
     //서버 에러
-    REDIS_CONNECTION_FAIL(HttpStatus.INTERNAL_SERVER_ERROR, "REDIS_5001", "Redis 연결 실패"),
-    DB_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "DB_5002", "DB 처리 중 에러 발생"),
-    EXTERNAL_API_FAIL(HttpStatus.BAD_GATEWAY, "AI_6000", "AI API 호출 실패"),
-
+    REDIS_CONNECTION_FAIL(HttpStatus.INTERNAL_SERVER_ERROR, "INFRA_500_001", "Redis 연결 실패"),
+    DB_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "INFRA_500_002", "DB 처리 중 에러 발생"),
+    AI_API_FAIL(HttpStatus.BAD_GATEWAY, "EXT_502_001", "AI API 호출 실패"),
+    GITHUB_API_FAIL(HttpStatus.BAD_GATEWAY, "EXT_502_002", "Github API 호출 실패");
     ;
 
 

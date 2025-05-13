@@ -1,4 +1,4 @@
-package Capstone.FOSSistant.global.config.AIConfig;
+package Capstone.FOSSistant.global.service.llm;
 
 import Capstone.FOSSistant.global.web.dto.IssueGuide.IssueGuideResponseDTO;
 import com.fasterxml.jackson.databind.ObjectMapper;

@@ -1,8 +1,7 @@
-package Capstone.FOSSistant.global.service;
+package Capstone.FOSSistant.global.service.llm;
 
-import Capstone.FOSSistant.global.config.AIConfig.GeminiChatClient;
-import Capstone.FOSSistant.global.config.GitHubHelper;
-import Capstone.FOSSistant.global.config.AIConfig.PromptBuilder;
+import Capstone.FOSSistant.global.service.GitHubHelperService;
+import Capstone.FOSSistant.global.service.IssueListServiceImpl;
 import Capstone.FOSSistant.global.web.dto.IssueGuide.IssueGuideResponseDTO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -13,7 +12,7 @@ public class GeminiGuideService {
 
     private final PromptBuilder promptBuilder;
     private final GeminiChatClient chatClient;
-    private final GitHubHelper githubHelper;
+    private final GitHubHelperService githubHelperService;
     private final IssueListServiceImpl issueListService;
 
     public IssueGuideResponseDTO generateGuide(String issueUrl) {
@@ -22,10 +21,10 @@ public class GeminiGuideService {
         String repo = parts[4];
         String issueNumber = parts[6];
 
-        String title = githubHelper.fetchIssueTitle(owner, repo, issueNumber);
-        String body = githubHelper.fetchIssueBody(owner, repo, issueNumber);
-        String readme = githubHelper.fetchReadme(owner, repo);
-        String structure = githubHelper.fetchRepoStructure(owner, repo);
+        String title = githubHelperService.fetchIssueTitle(owner, repo, issueNumber);
+        String body = githubHelperService.fetchIssueBody(owner, repo, issueNumber);
+        String readme = githubHelperService.fetchReadme(owner, repo);
+        String structure = githubHelperService.fetchRepoStructure(owner, repo);
 
         String prompt = promptBuilder.buildPrompt(title, body, readme, structure);
 

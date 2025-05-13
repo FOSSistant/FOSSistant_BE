@@ -1,4 +1,4 @@
-package Capstone.FOSSistant.global.config.AIConfig;
+package Capstone.FOSSistant.global.service.llm;
 
 import org.springframework.stereotype.Component;
 

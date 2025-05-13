@@ -2,16 +2,18 @@ package Capstone.FOSSistant.global.web.controller;
 
 import Capstone.FOSSistant.global.apiPayload.ApiResponse;
 import Capstone.FOSSistant.global.apiPayload.code.status.SuccessStatus;
-import Capstone.FOSSistant.global.service.GeminiGuideService;
+import Capstone.FOSSistant.global.service.llm.GeminiGuideService;
 import Capstone.FOSSistant.global.web.dto.IssueGuide.IssueGuideRequestDTO;
 import Capstone.FOSSistant.global.web.dto.IssueGuide.IssueGuideResponseDTO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
+@Validated
 @RequestMapping("/issues")
 @RequiredArgsConstructor
 @Tag(name = "이슈 가이드 생성 API")
