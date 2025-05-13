@@ -10,7 +10,7 @@ import lombok.Getter;
 @Getter
 @AllArgsConstructor
 @JsonPropertyOrder({"isSuccess", "code", "message", "result"})
-public class ApiResponse<T> {
+public class APiResponse<T> {
     @JsonProperty("isSuccess")
     private final Boolean isSuccess;
     private final String code;
@@ -19,8 +19,8 @@ public class ApiResponse<T> {
     private T result;
 
     // 성공한 경우 응답 생성
-    public static <T> ApiResponse<T> onSuccess(SuccessStatus status, T result){
-        return new ApiResponse<>(true, status.getCode(), status.getMessage(), result);
+    public static <T> APiResponse<T> onSuccess(SuccessStatus status, T result){
+        return new APiResponse<>(true, status.getCode(), status.getMessage(), result);
     }
 
 //    public static <T> ApiResponse<T> of(BaseCode code, T result){
@@ -28,8 +28,8 @@ public class ApiResponse<T> {
 //    }
 
     // 실패한 경우 응답 생성
-    public static <T> ApiResponse<T> onFailure(String code, String message, T data){
-        return new ApiResponse<>(false, code, message, data);
+    public static <T> APiResponse<T> onFailure(String code, String message, T data){
+        return new APiResponse<>(false, code, message, data);
     }
 }
 
