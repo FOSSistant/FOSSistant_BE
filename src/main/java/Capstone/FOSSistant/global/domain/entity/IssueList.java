@@ -17,6 +17,6 @@ public class IssueList extends BaseEntity {
     private String id;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(nullable = false, length = 10)
     private Tag difficulty;
 }

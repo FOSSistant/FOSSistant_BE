@@ -31,6 +31,7 @@ public class IssueListServiceImpl implements IssueListService {
     private final StringRedisTemplate redisTemplate;
     private final GitHubHelperService githubHelperService;
     private final IssueListConverter issueListConverter;
+    private final AIClassifierClient aiClassifierClient;
 
     @Override
     public CompletableFuture<IssueListResponseDTO.IssueResponseDTO> classify(IssueListRequestDTO.IssueRequestDTO dto) {
@@ -75,6 +76,7 @@ public class IssueListServiceImpl implements IssueListService {
 
     private Tag safeClassify(String issueUrl) {
         try {
+            log.debug("classify 시작: {}", issueUrl);
             // 이슈 URL → owner, repo, issueNumber 추출
             String[] parts = issueUrl.split("/");
             String owner = parts[3];
@@ -85,7 +87,10 @@ public class IssueListServiceImpl implements IssueListService {
             String title = githubHelperService.fetchIssueTitle(owner, repo, issueNumber);
             String body = githubHelperService.fetchIssueBody(owner, repo, issueNumber);
 
-            return dummyClassify(title, body);
+            String shortBody = body.replaceAll("(?s)```.*?```", "");
+
+
+            return classifyWithAI(title, shortBody);
 
         } catch (GithubApiException e) {
             log.warn("GitHub API 호출 실패: {}", e.getMessage());
@@ -101,6 +106,21 @@ public class IssueListServiceImpl implements IssueListService {
             return Tag.HARD;
         } else {
             return Tag.EASY;
+        }
+    }
+
+    public Tag classifyWithAI(String title, String body) {
+        try {
+            String result = aiClassifierClient.classify(title, body).toLowerCase();
+            return switch (result) {
+                case "easy" -> Tag.EASY;
+                case "medium" -> Tag.MEDIUM;
+                case "hard" -> Tag.HARD;
+                default -> Tag.MISC;
+            };
+        } catch (Exception e) {
+            log.error("AI API 분류 실패", e);
+            throw new ClassificationException(ErrorStatus.AI_API_FAIL);
         }
     }
 }

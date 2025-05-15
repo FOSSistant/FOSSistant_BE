@@ -30,7 +30,7 @@ public class GeminiGuideService {
 
         IssueGuideResponseDTO geminiResponse = chatClient.call(prompt);
 
-        String difficulty = issueListService.dummyClassify(title, body).name().toLowerCase();
+        String difficulty = issueListService.classifyWithAI(title, body).name().toLowerCase();
 
         return IssueGuideResponseDTO.builder()
                 .title(title)
