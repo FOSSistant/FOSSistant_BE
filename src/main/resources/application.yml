@@ -19,7 +19,7 @@ spring:
         format_sql: true
         use_sql_comments: true
         hbm2ddl:
-          auto: create       # ※운영 환경에서는 create → update
+          auto: update       # ※운영 환경에서는 create → update
         default_batch_fetch_size: 1000
   sql:
     init:
@@ -27,7 +27,7 @@ spring:
 
   data:
     redis:
-      host: localhost # ※운영 환경에서는 localhost → redis
+      host: redis # ※운영 환경에서는 localhost → redis
       port: 6379
 
   gemini:
