@@ -43,10 +43,11 @@ public class IssueListController {
     @ApiErrorCodeExamples({ErrorStatus.AI_API_FAIL, ErrorStatus.GITHUB_API_FAIL, ErrorStatus._INTERNAL_SERVER_ERROR, ErrorStatus.REDIS_CONNECTION_FAIL})
     public APiResponse<IssueListResponseDTO> classifyIssues(
             @RequestBody @Valid IssueListRequestDTO requestDTO) {
-        List<CompletableFuture<IssueListResponseDTO.IssueResponseDTO>> futures = requestDTO.getIssues().stream()
-                .map(issueListService::classify)
-                .toList();
+        // 서비스에서 batch, 병렬, sleep 처리
+        List<CompletableFuture<IssueListResponseDTO.IssueResponseDTO>> futures =
+                issueListService.classifyAll(requestDTO.getIssues());
 
+        // 모든 Future 결과 모음
         List<IssueListResponseDTO.IssueResponseDTO> results = futures.stream()
                 .map(CompletableFuture::join)
                 .toList();

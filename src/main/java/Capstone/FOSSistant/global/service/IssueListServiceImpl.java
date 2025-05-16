@@ -1,5 +1,6 @@
 package Capstone.FOSSistant.global.service;
 
+import Capstone.FOSSistant.global.aop.annotation.MeasureExecutionTime;
 import Capstone.FOSSistant.global.apiPayload.code.status.ErrorStatus;
 import Capstone.FOSSistant.global.apiPayload.exception.ClassificationException;
 import Capstone.FOSSistant.global.converter.IssueListConverter;
@@ -34,6 +35,7 @@ public class IssueListServiceImpl implements IssueListService {
     private final AIClassifierClient aiClassifierClient;
 
     @Override
+    @MeasureExecutionTime
     public CompletableFuture<IssueListResponseDTO.IssueResponseDTO> classify(IssueListRequestDTO.IssueRequestDTO dto) {
         String key = "issue:" + dto.getIssueId();
 
@@ -64,6 +66,7 @@ public class IssueListServiceImpl implements IssueListService {
                 });
     }
 
+    @MeasureExecutionTime
     public CompletableFuture<Tag> safeClassify(String issueUrl) {
         return CompletableFuture.supplyAsync(() -> {
             try {
@@ -99,6 +102,7 @@ public class IssueListServiceImpl implements IssueListService {
                 .toFuture();
     }
 
+    @MeasureExecutionTime
     public List<CompletableFuture<IssueListResponseDTO.IssueResponseDTO>> classifyAll(List<IssueListRequestDTO.IssueRequestDTO> dtoList) {
         int batchSize = 5;
         List<CompletableFuture<IssueListResponseDTO.IssueResponseDTO>> allFutures = new ArrayList<>();
