@@ -13,7 +13,6 @@ public class GitHubIssueUrlValidator implements ConstraintValidator<ValidGitHubI
         if (value == null || value.trim().isEmpty()) {
             return false; // NotBlank 조건
         }
-
         return value.matches(REGEX);
     }
 }
