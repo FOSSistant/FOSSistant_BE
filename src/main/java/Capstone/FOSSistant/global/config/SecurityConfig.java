@@ -44,14 +44,9 @@ public class SecurityConfig {
     @Bean
     CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        config.setAllowCredentials(true);
+        config.setAllowCredentials(false);
 //        config.setAllowedOriginPatterns(List.of("*", "http://localhost:3000"));
-        config.setAllowedOriginPatterns(List.of(
-                "http://localhost:3000",
-                "https://github.com",
-                "https://gist.github.com",
-                "https://*.github.io"
-        ));
+        config.setAllowedOriginPatterns(List.of("*"));
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
         config.setExposedHeaders(List.of("*"));
