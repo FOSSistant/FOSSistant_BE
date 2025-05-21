@@ -3,6 +3,7 @@ package Capstone.FOSSistant.global.service;
 import Capstone.FOSSistant.global.apiPayload.code.status.ErrorStatus;
 import Capstone.FOSSistant.global.apiPayload.exception.GithubApiException;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -15,13 +16,16 @@ import org.springframework.web.client.RestTemplate;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class GitHubHelperService {
 
-    private final RestTemplate restTemplate = new RestTemplate();
+    private final RestTemplate restTemplate;
+    private final ObjectMapper objectMapper = new ObjectMapper();
+
 
     @Value("${spring.github.token}")
     private String githubToken;
@@ -32,95 +36,125 @@ public class GitHubHelperService {
         log.debug("GitHub token initialized: '{}'", githubToken.isEmpty() ? "[NONE]" : "[PROVIDED]");
     }
 
-    public String fetchReadme(String owner, String repo) {
-        String url = String.format("https://api.github.com/repos/%s/%s/readme", owner, repo);
-        HttpEntity<Void> entity = new HttpEntity<>(createAuthHeaders(true));
-
-        try {
-            ResponseEntity<String> resp = restTemplate.exchange(url, HttpMethod.GET, entity, String.class);
-            return resp.getBody();
-        } catch (HttpClientErrorException.NotFound e) {
-            return "";
-        } catch (RestClientException e) {
-            throw new GithubApiException(ErrorStatus.GITHUB_API_FAIL);
-        }
-    }
-
-    public String fetchRepoStructure(String owner, String repo) {
-        String defaultBranch = fetchDefaultBranch(owner, repo);
-        String url = String.format("https://api.github.com/repos/%s/%s/git/trees/%s?recursive=1",
-                owner, repo, defaultBranch);
-        HttpEntity<Void> entity = new HttpEntity<>(createAuthHeaders(false));
-
-        try {
-            ResponseEntity<JsonNode> resp = restTemplate.exchange(url, HttpMethod.GET, entity, JsonNode.class);
-            List<String> paths = new ArrayList<>();
-            for (JsonNode node : resp.getBody().path("tree")) {
-                paths.add(node.path("path").asText());
-            }
-            return String.join("\n", paths);
-        } catch (HttpClientErrorException.NotFound e) {
-            return "";
-        } catch (RestClientException e) {
-            throw new GithubApiException(ErrorStatus.GITHUB_API_FAIL);
-        }
-    }
-
-    private String fetchDefaultBranch(String owner, String repo) {
-        String url = String.format("https://api.github.com/repos/%s/%s", owner, repo);
-        HttpEntity<Void> entity = new HttpEntity<>(createAuthHeaders(false));
-        try {
-            ResponseEntity<JsonNode> resp = restTemplate.exchange(url, HttpMethod.GET, entity, JsonNode.class);
-            JsonNode body = resp.getBody();
-            return body.hasNonNull("default_branch")
-                    ? body.get("default_branch").asText()
-                    : "main";
-        } catch (RestClientException e) {
-            return "main";
-        }
-    }
-
-    public String fetchIssueTitle(String owner, String repo, String issueNumber) {
+    public String[] fetchIssueData(String owner, String repo, String issueNumber) {
         long start = System.currentTimeMillis();
-        JsonNode issue = fetchIssueJson(owner, repo, issueNumber);
-        long end = System.currentTimeMillis();
-        log.info("[GitHub issue title fetch 시간] {}ms", (end - start));
 
-        return issue.hasNonNull("title") ? issue.get("title").asText() : "";
-    }
+        String query = String.format("""
+                query {
+                  repository(owner: \"%s\", name: \"%s\") {
+                    issue(number: %s) {
+                      title
+                      body
+                    }
+                  }
+                }
+                """, owner, repo, issueNumber);
 
-    public String fetchIssueBody(String owner, String repo, String issueNumber) {
-        long start = System.currentTimeMillis();
-        JsonNode issue = fetchIssueJson(owner, repo, issueNumber);
-        long end = System.currentTimeMillis();
-        log.info("[GitHub issue body fetch 시간] {}ms", (end - start));
-
-        return issue.hasNonNull("body") ? issue.get("body").asText() : "";
-    }
-
-    private JsonNode fetchIssueJson(String owner, String repo, String issueNumber) {
-        String url = String.format("https://api.github.com/repos/%s/%s/issues/%s", owner, repo, issueNumber);
-        HttpEntity<Void> entity = new HttpEntity<>(createAuthHeaders(false));
-        try {
-            ResponseEntity<JsonNode> resp = restTemplate.exchange(url, HttpMethod.GET, entity, JsonNode.class);
-            return resp.getBody();
-        } catch (HttpClientErrorException e) {
-            log.error("GitHub API Error: {} – {}", e.getStatusCode(), e.getResponseBodyAsString());
-            throw new GithubApiException(ErrorStatus.GITHUB_API_FAIL);
-        } catch (RestClientException e) {
-            throw new GithubApiException(ErrorStatus.GITHUB_API_FAIL);
-        }
-    }
-
-    private HttpHeaders createAuthHeaders(boolean rawReadme) {
         HttpHeaders headers = new HttpHeaders();
         headers.setBearerAuth(githubToken);
-        headers.set("User-Agent", "FOSSistant/1.0");
-        if (rawReadme) {
-            headers.set("Accept", "application/vnd.github.v3.raw");
-        } else {
-            headers.set("Accept", "application/vnd.github.v3+json");
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.set("Accept", "application/json");
+
+        HttpEntity<Map<String, String>> request = new HttpEntity<>(Map.of("query", query), headers);
+
+        try {
+            ResponseEntity<JsonNode> response = restTemplate.exchange(
+                    "https://api.github.com/graphql",
+                    HttpMethod.POST,
+                    request,
+                    JsonNode.class
+            );
+
+            JsonNode issueNode = response.getBody()
+                    .path("data")
+                    .path("repository")
+                    .path("issue");
+
+            String title = issueNode.path("title").asText("");
+            String body = issueNode.path("body").asText("");
+
+            long end = System.currentTimeMillis();
+            log.info("[GitHub GraphQL 이슈 fetch 시간] {}ms", (end - start));
+
+            return new String[]{title, body};
+
+        } catch (RestClientException e) {
+            log.error("GitHub GraphQL API 호출 실패", e);
+            throw new GithubApiException(ErrorStatus.GITHUB_API_FAIL);
         }
-        return headers;
     }
+
+    public GitHubData fetchAllData(String owner, String repo, String issueNumber) {
+        long start = System.currentTimeMillis();
+
+        String query = String.format("""
+        query {
+          repository(owner: "%s", name: "%s") {
+            issue(number: %s) {
+              title
+              body
+            }
+            defaultBranchRef {
+              name
+              target {
+                ... on Commit {
+                  tree {
+                    entries {
+                      path
+                    }
+                  }
+                }
+              }
+            }
+            readme: object(expression: "HEAD:README.md") {
+              ... on Blob {
+                text
+              }
+            }
+          }
+        }
+        """, owner, repo, issueNumber);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(githubToken);
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.set("Accept", "application/json");
+
+        HttpEntity<Map<String, String>> request = new HttpEntity<>(Map.of("query", query), headers);
+
+        try {
+            ResponseEntity<JsonNode> response = restTemplate.exchange(
+                    "https://api.github.com/graphql",
+                    HttpMethod.POST,
+                    request,
+                    JsonNode.class
+            );
+
+            JsonNode repository = response.getBody().path("data").path("repository");
+
+            String title = repository.path("issue").path("title").asText("");
+            String body = repository.path("issue").path("body").asText("");
+            String readme = repository.path("readme").path("text").asText("");
+
+            StringBuilder structure = new StringBuilder();
+            for (JsonNode node : repository
+                    .path("defaultBranchRef")
+                    .path("target")
+                    .path("tree")
+                    .path("entries")) {
+                structure.append(node.path("path").asText()).append("\n");
+            }
+
+            long end = System.currentTimeMillis();
+            log.info("[GitHub GraphQL 전체 데이터 fetch 시간] {}ms", (end - start));
+
+            return new GitHubData(title, body, readme, structure.toString().trim());
+
+        } catch (RestClientException e) {
+            log.error("GitHub GraphQL API 호출 실패", e);
+            throw new GithubApiException(ErrorStatus.GITHUB_API_FAIL);
+        }
+    }
+
+    public record GitHubData(String title, String body, String readme, String structure) {}
 }

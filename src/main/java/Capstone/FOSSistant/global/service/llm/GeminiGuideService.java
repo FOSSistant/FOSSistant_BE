@@ -1,57 +1,16 @@
 package Capstone.FOSSistant.global.service.llm;
 
+import Capstone.FOSSistant.global.aop.annotation.MeasureExecutionTime;
 import Capstone.FOSSistant.global.service.GitHubHelperService;
 import Capstone.FOSSistant.global.service.IssueListServiceImpl;
 import Capstone.FOSSistant.global.web.dto.IssueGuide.IssueGuideResponseDTO;
 import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Service;
-
-//@Service
-//@RequiredArgsConstructor
-//public class GeminiGuideService {
-//
-//    private final PromptBuilder promptBuilder;
-//    private final GeminiChatClient chatClient;
-//    private final GitHubHelperService githubHelperService;
-//    private final IssueListServiceImpl issueListService;
-//
-//    public IssueGuideResponseDTO generateGuide(String issueUrl) {
-//        String[] parts = issueUrl.split("/");
-//        String owner = parts[3];
-//        String repo = parts[4];
-//        String issueNumber = parts[6];
-//
-//        String title = githubHelperService.fetchIssueTitle(owner, repo, issueNumber);
-//        String body = githubHelperService.fetchIssueBody(owner, repo, issueNumber);
-//        String readme = githubHelperService.fetchReadme(owner, repo);
-//        String structure = githubHelperService.fetchRepoStructure(owner, repo);
-//
-//        String prompt = promptBuilder.buildPrompt(title, body, readme, structure);
-//
-//        IssueGuideResponseDTO geminiResponse = chatClient.call(prompt);
-//
-//        String difficulty = issueListService.classifyWithAI(title, body).name().toLowerCase();
-//
-//        return IssueGuideResponseDTO.builder()
-//                .title(title)
-//                .difficulty(difficulty)
-//                .description(geminiResponse.getDescription())
-//                .solution(geminiResponse.getSolution())
-//                .caution(geminiResponse.getCaution())
-//                .build();
-//    }
-//
-//}
-
-
-import Capstone.FOSSistant.global.service.GitHubHelperService;
-import Capstone.FOSSistant.global.service.IssueListServiceImpl;
-import Capstone.FOSSistant.global.web.dto.IssueGuide.IssueGuideResponseDTO;
-import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.concurrent.CompletableFuture;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class GeminiGuideService {
@@ -61,22 +20,33 @@ public class GeminiGuideService {
     private final GitHubHelperService githubHelperService;
     private final IssueListServiceImpl issueListService;
 
+    @MeasureExecutionTime
     public CompletableFuture<IssueGuideResponseDTO> generateGuide(String issueUrl) {
+        long totalStart = System.currentTimeMillis();
+
         return CompletableFuture.supplyAsync(() -> {
+            long githubStart = System.currentTimeMillis();
+
             String[] parts = issueUrl.split("/");
             String owner = parts[3];
             String repo = parts[4];
             String issueNumber = parts[6];
 
-            String title = githubHelperService.fetchIssueTitle(owner, repo, issueNumber);
-            String body = githubHelperService.fetchIssueBody(owner, repo, issueNumber);
-            String readme = githubHelperService.fetchReadme(owner, repo);
-            String structure = githubHelperService.fetchRepoStructure(owner, repo);
+            GitHubHelperService.GitHubData data = githubHelperService.fetchAllData(owner, repo, issueNumber);
+            String title = data.title();
+            String body = data.body();
+            String readme = data.readme();
+            String structure = data.structure();
+            long githubEnd = System.currentTimeMillis();
+            log.info("[GitHub API 총 호출 시간] {}ms", (githubEnd - githubStart));
+
+            long geminiStart = System.currentTimeMillis();
 
             String prompt = promptBuilder.buildPrompt(title, body, readme, structure);
             IssueGuideResponseDTO geminiResponse = chatClient.call(prompt);
+            long geminiEnd = System.currentTimeMillis();
+            log.info("[Gemini 응답 처리 시간] {}ms", (geminiEnd - geminiStart));
 
-            // 이 title/body를 사용해 classifyWithAI를 비동기적으로 호출
             return new String[]{title, body, geminiResponse.getDescription(), geminiResponse.getSolution(), geminiResponse.getCaution()};
         }).thenCompose(arr ->
                 issueListService.classifyWithAI(arr[0], arr[1])
@@ -89,6 +59,12 @@ public class GeminiGuideService {
                                         .caution(arr[4])
                                         .build()
                         )
-        );
+        ).whenComplete((res, ex) -> {
+            long totalEnd = System.currentTimeMillis();
+            if (ex != null) {
+                log.error("[generateGuide 실패] 에러: {}", ex.getMessage(), ex);
+            }
+            log.info("[generateGuide 전체 소요 시간] {}ms", (totalEnd - totalStart));
+        });
     }
 }

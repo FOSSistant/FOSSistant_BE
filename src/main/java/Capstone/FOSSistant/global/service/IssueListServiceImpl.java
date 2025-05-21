@@ -126,8 +126,9 @@ public class IssueListServiceImpl implements IssueListService {
             String owner = parts[3];
             String repo = parts[4];
             String issueNumber = parts[6];
-            String title = githubHelperService.fetchIssueTitle(owner, repo, issueNumber);
-            String body = githubHelperService.fetchIssueBody(owner, repo, issueNumber);
+            String[] titleAndBody = githubHelperService.fetchIssueData(owner, repo, issueNumber);
+            String title = titleAndBody[0];
+            String body = titleAndBody[1];
             return new String[]{title, body};
         } catch (Exception e) {
             throw new ClassificationException(ErrorStatus.AI_API_FAIL);
