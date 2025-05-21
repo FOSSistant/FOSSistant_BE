@@ -25,6 +25,10 @@ bin/
 out/
 !**/src/main/**/out/
 !**/src/test/**/out/
+/logs
+logback-spring.xml
+src/main/resources/logback-spring.xml
+
 
 ### NetBeans ###
 /nbproject/private/

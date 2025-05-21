@@ -34,76 +34,12 @@ public class IssueListServiceImpl implements IssueListService {
     private final IssueListConverter issueListConverter;
     private final AIClassifierClient aiClassifierClient;
 
+    //여러 이슈 분류 요청 (batch + sleep으로 AI 서버 부하 제어)
     @Override
     @MeasureExecutionTime
-    public CompletableFuture<IssueListResponseDTO.IssueResponseDTO> classify(IssueListRequestDTO.IssueRequestDTO dto) {
-        String key = "issue:" + dto.getIssueId();
-
-        return CompletableFuture.supplyAsync(() -> redisTemplate.opsForValue().get(key))
-                .thenCompose(cached -> {
-                    if (cached != null) {
-                        return CompletableFuture.completedFuture(issueListConverter.toResponseDTO(
-                                dto.getIssueId(), Tag.valueOf(cached.toUpperCase())));
-                    }
-
-                    return safeClassify(dto.getIssueId())
-                            .thenApply(difficulty -> {
-                                try {
-                                    redisTemplate.opsForValue().set(key, difficulty.name().toLowerCase(), Duration.ofDays(7));
-                                } catch (RedisConnectionFailureException e) {
-                                    log.warn("Redis 저장 실패: {}", e.getMessage());
-                                }
-
-                                try {
-                                    var entity = issueListConverter.toEntity(dto, difficulty);
-                                    issueListRepository.save(entity);
-                                } catch (DataAccessException e) {
-                                    log.warn("DB 저장 실패: {}", e.getMessage());
-                                }
-
-                                return issueListConverter.toResponseDTO(dto.getIssueId(), difficulty);
-                            });
-                });
-    }
-
-    @MeasureExecutionTime
-    public CompletableFuture<Tag> safeClassify(String issueUrl) {
-        return CompletableFuture.supplyAsync(() -> {
-            try {
-                String[] parts = issueUrl.split("/");
-                String owner = parts[3];
-                String repo = parts[4];
-                String issueNumber = parts[6];
-                String title = githubHelperService.fetchIssueTitle(owner, repo, issueNumber);
-                String body = githubHelperService.fetchIssueBody(owner, repo, issueNumber);
-                return new String[]{title, body};
-            } catch (Exception e) {
-                throw new ClassificationException(ErrorStatus.AI_API_FAIL);
-            }
-        }).thenCompose(arr -> classifyWithAI(arr[0], arr[1]));
-    }
-
-    public CompletableFuture<Tag> classifyWithAI(String title, String body) {
-        return aiClassifierClient.classify(title, body)
-                .map(result -> {
-                    try {
-                        String diff = new ObjectMapper().readTree(result).get("difficulty").asText().toLowerCase();
-                        return switch (diff) {
-                            case "easy" -> Tag.EASY;
-                            case "medium" -> Tag.MEDIUM;
-                            case "hard" -> Tag.HARD;
-                            default -> Tag.MISC;
-                        };
-                    } catch (Exception e) {
-                        log.error("응답 파싱 실패", e);
-                        return Tag.MISC;
-                    }
-                })
-                .toFuture();
-    }
-
-    @MeasureExecutionTime
     public List<CompletableFuture<IssueListResponseDTO.IssueResponseDTO>> classifyAll(List<IssueListRequestDTO.IssueRequestDTO> dtoList) {
+        long start = System.currentTimeMillis();
+
         int batchSize = 5;
         List<CompletableFuture<IssueListResponseDTO.IssueResponseDTO>> allFutures = new ArrayList<>();
 
@@ -119,12 +55,107 @@ public class IssueListServiceImpl implements IssueListService {
             allFutures.addAll(batchFutures);
 
             try {
-                Thread.sleep(500); // AI 서버 부하 줄이기
+                Thread.sleep(10); // AI 서버 부하 줄이기
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
             }
         }
 
+        long end = System.currentTimeMillis();
+        log.info("[총 classifyAll 소요 시간] {}ms", (end - start));
+
         return allFutures;
+    }
+
+
+    //단건 이슈 분류
+    @MeasureExecutionTime
+    private CompletableFuture<IssueListResponseDTO.IssueResponseDTO> classify(IssueListRequestDTO.IssueRequestDTO dto) {
+        String key = "issue:" + dto.getIssueId();
+
+        return CompletableFuture.supplyAsync(() -> redisTemplate.opsForValue().get(key))
+                .thenCompose(cached -> {
+                    if (cached != null) {
+                        Tag cachedTag = Tag.valueOf(cached.toUpperCase());
+                        return CompletableFuture.completedFuture(issueListConverter.toResponseDTO(dto.getIssueId(), cachedTag));
+                    }
+
+                    return safeClassify(dto.getIssueId())
+                            .thenApply(difficulty -> {
+                                cacheDifficulty(key, difficulty);
+                                persistDifficulty(dto, difficulty);
+                                return issueListConverter.toResponseDTO(dto.getIssueId(), difficulty);
+                            });
+                });
+    }
+
+    //캐시 저장
+    @MeasureExecutionTime
+    private void cacheDifficulty(String key, Tag difficulty) {
+        try {
+            redisTemplate.opsForValue().set(key, difficulty.name().toLowerCase(), Duration.ofDays(7));
+        } catch (RedisConnectionFailureException e) {
+            log.warn("Redis 저장 실패: {}", e.getMessage());
+        }
+    }
+
+    //DB 저장
+    @MeasureExecutionTime
+    private void persistDifficulty(IssueListRequestDTO.IssueRequestDTO dto, Tag difficulty) {
+        try {
+            var entity = issueListConverter.toEntity(dto, difficulty);
+            issueListRepository.save(entity);
+        } catch (DataAccessException e) {
+            log.warn("DB 저장 실패: {}", e.getMessage());
+        }
+    }
+
+
+
+    //이슈 URL로부터 title + body 추출 후 AI 분류
+    private CompletableFuture<Tag> safeClassify(String issueUrl) {
+        return CompletableFuture.supplyAsync(() -> extractTitleAndBody(issueUrl))
+                .thenCompose(arr -> classifyWithAI(arr[0], arr[1]));
+    }
+
+    //GitHub API 호출 → 제목과 본문 추출
+    @MeasureExecutionTime
+    private String[] extractTitleAndBody(String issueUrl) {
+        try {
+            String[] parts = issueUrl.split("/");
+            String owner = parts[3];
+            String repo = parts[4];
+            String issueNumber = parts[6];
+            String title = githubHelperService.fetchIssueTitle(owner, repo, issueNumber);
+            String body = githubHelperService.fetchIssueBody(owner, repo, issueNumber);
+            return new String[]{title, body};
+        } catch (Exception e) {
+            throw new ClassificationException(ErrorStatus.AI_API_FAIL);
+        }
+    }
+
+    //AI 분류 요청 → difficulty 추출
+    public CompletableFuture<Tag> classifyWithAI(String title, String body) {
+        long start = System.currentTimeMillis();
+
+        return aiClassifierClient.classify(title, body)
+                .map(result -> {
+                    long end = System.currentTimeMillis();
+                    log.info("[AI 분류 소요 시간] {}ms", (end - start));
+
+                    try {
+                        String diff = new ObjectMapper().readTree(result).get("difficulty").asText().toLowerCase();
+                        return switch (diff) {
+                            case "easy" -> Tag.EASY;
+                            case "medium" -> Tag.MEDIUM;
+                            case "hard" -> Tag.HARD;
+                            default -> Tag.MISC;
+                        };
+                    } catch (Exception e) {
+                        log.error("응답 파싱 실패", e);
+                        return Tag.MISC;
+                    }
+                })
+                .toFuture();
     }
 }

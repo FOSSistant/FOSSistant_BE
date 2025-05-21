@@ -22,6 +22,8 @@ public class AIClassifierClient {
         String shortBody = (body == null || body.isBlank()) ? "(no description provided)" : body;
         shortBody = shortBody.replaceAll("(?s)```.*?```", "");
 
+        long start = System.currentTimeMillis();
+
         return webClient.post()
                 .uri("https://api.ucyang.com/v1/fossistant/difficulty/")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -29,6 +31,14 @@ public class AIClassifierClient {
                 .retrieve()
                 .bodyToMono(String.class)
                 .timeout(Duration.ofSeconds(10))
+                .doOnSuccess(result -> {
+                    long end = System.currentTimeMillis();
+                    log.info("[AI API 호출 + 응답 수신 시간] {}ms", (end - start));
+                })
+                .doOnError(e -> {
+                    long end = System.currentTimeMillis();
+                    log.warn("[AI API 호출 실패 시간] {}ms", (end - start));
+                })
                 .onErrorResume(e -> {
                     log.error("AI 호출 실패 → fallback to MISC", e);
                     return Mono.just("{\"difficulty\": \"misc\"}");

@@ -81,12 +81,20 @@ public class GitHubHelperService {
     }
 
     public String fetchIssueTitle(String owner, String repo, String issueNumber) {
+        long start = System.currentTimeMillis();
         JsonNode issue = fetchIssueJson(owner, repo, issueNumber);
+        long end = System.currentTimeMillis();
+        log.info("[GitHub issue title fetch 시간] {}ms", (end - start));
+
         return issue.hasNonNull("title") ? issue.get("title").asText() : "";
     }
 
     public String fetchIssueBody(String owner, String repo, String issueNumber) {
+        long start = System.currentTimeMillis();
         JsonNode issue = fetchIssueJson(owner, repo, issueNumber);
+        long end = System.currentTimeMillis();
+        log.info("[GitHub issue body fetch 시간] {}ms", (end - start));
+
         return issue.hasNonNull("body") ? issue.get("body").asText() : "";
     }
 
