@@ -10,6 +10,7 @@ import org.springframework.web.reactive.function.client.WebClientResponseExcepti
 import reactor.core.publisher.Mono;
 
 import java.time.Duration;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeoutException;
 
@@ -26,10 +27,18 @@ public class AIClassifierClient {
 
         long start = System.currentTimeMillis();
 
+        Map<String, Object> payload = Map.of(
+                "issues", List.of(Map.of(
+                        "title", title,
+                        "body", shortBody
+                ))
+        );
+
+
         return webClient.post()
                 .uri("https://api.ucyang.com/v1/fossistant/difficulty/")
                 .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(Map.of("title", title, "body", shortBody))
+                .bodyValue(payload)
                 .retrieve()
                 .bodyToMono(String.class)
                 .timeout(Duration.ofSeconds(10))
@@ -41,7 +50,6 @@ public class AIClassifierClient {
                     long end = System.currentTimeMillis();
                     log.warn("[AI API 호출 실패 시간] {}ms", (end - start));
                 })
-                .timeout(Duration.ofSeconds(10))
                 .onErrorResume(TimeoutException.class, e -> {
                     log.warn("AI Timeout 발생", e);
                     return Mono.just("{\"difficulty\": \"misc\"}");
@@ -52,10 +60,6 @@ public class AIClassifierClient {
                 })
                 .onErrorResume(Exception.class, e -> {
                     log.error("AI 기타 예외 발생", e);
-                    return Mono.just("{\"difficulty\": \"misc\"}");
-                })
-                .onErrorResume(e -> {
-                    log.error("AI 호출 실패 → fallback to MISC", e);
                     return Mono.just("{\"difficulty\": \"misc\"}");
                 });
     }
