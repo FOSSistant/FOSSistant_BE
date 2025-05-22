@@ -155,6 +155,61 @@ public class GitHubHelperService {
             throw new GithubApiException(ErrorStatus.GITHUB_API_FAIL);
         }
     }
+    public record RepoMeta(String readme, String structure) {}
+
+    public RepoMeta fetchRepoMetadata(String owner, String repo) {
+        long start = System.currentTimeMillis();
+
+        String query = String.format("""
+        query {
+          repository(owner: "%s", name: "%s") {
+            readme: object(expression: "HEAD:README.md") {
+              ... on Blob { text }
+            }
+            defaultBranchRef {
+              target {
+                ... on Commit {
+                  tree {
+                    entries {
+                      path
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+    """, owner, repo);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(githubToken);
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.set("Accept", "application/json");
+
+        HttpEntity<Map<String, String>> request = new HttpEntity<>(Map.of("query", query), headers);
+
+        try {
+            ResponseEntity<JsonNode> response = restTemplate.exchange(
+                    "https://api.github.com/graphql", HttpMethod.POST, request, JsonNode.class
+            );
+
+            JsonNode repoNode = response.getBody().path("data").path("repository");
+            String readme = repoNode.path("readme").path("text").asText("");
+            StringBuilder structure = new StringBuilder();
+            for (JsonNode node : repoNode
+                    .path("defaultBranchRef").path("target")
+                    .path("tree").path("entries")) {
+                structure.append(node.path("path").asText()).append("\n");
+            }
+
+            long end = System.currentTimeMillis();
+            log.info("[GitHub GraphQL repoMeta fetch 시간] {}ms", end - start);
+            return new RepoMeta(readme, structure.toString().trim());
+        } catch (RestClientException e) {
+            log.error("Repo 메타데이터 조회 실패", e);
+            throw new GithubApiException(ErrorStatus.GITHUB_API_FAIL);
+        }
+    }
 
     public record GitHubData(String title, String body, String readme, String structure) {}
 }

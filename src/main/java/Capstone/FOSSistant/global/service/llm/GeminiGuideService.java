@@ -1,13 +1,17 @@
 package Capstone.FOSSistant.global.service.llm;
 
 import Capstone.FOSSistant.global.aop.annotation.MeasureExecutionTime;
+import Capstone.FOSSistant.global.domain.enums.Tag;
 import Capstone.FOSSistant.global.service.GitHubHelperService;
 import Capstone.FOSSistant.global.service.IssueListServiceImpl;
 import Capstone.FOSSistant.global.web.dto.IssueGuide.IssueGuideResponseDTO;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
+import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
 
 @Slf4j
@@ -19,10 +23,25 @@ public class GeminiGuideService {
     private final GeminiChatClient chatClient;
     private final GitHubHelperService githubHelperService;
     private final IssueListServiceImpl issueListService;
+    private final StringRedisTemplate redisTemplate;
+    private final ObjectMapper objectMapper;
 
     @MeasureExecutionTime
     public CompletableFuture<IssueGuideResponseDTO> generateGuide(String issueUrl) {
         long totalStart = System.currentTimeMillis();
+        String issueKey = "llm:guide:" + issueUrl;
+
+        // 1. LLM 응답 캐싱 여부 확인
+        String cached = redisTemplate.opsForValue().get(issueKey);
+        if (cached != null) {
+            try {
+                log.info("[캐시된 LLM 응답 반환]");
+                IssueGuideResponseDTO cachedDTO = objectMapper.readValue(cached, IssueGuideResponseDTO.class);
+                return CompletableFuture.completedFuture(cachedDTO);
+            } catch (Exception e) {
+                log.warn("캐시 파싱 실패 → 재요청");
+            }
+        }
 
         return CompletableFuture.supplyAsync(() -> {
             long githubStart = System.currentTimeMillis();
@@ -32,39 +51,86 @@ public class GeminiGuideService {
             String repo = parts[4];
             String issueNumber = parts[6];
 
-            GitHubHelperService.GitHubData data = githubHelperService.fetchAllData(owner, repo, issueNumber);
-            String title = data.title();
-            String body = data.body();
-            String readme = data.readme();
-            String structure = data.structure();
+            // repo 단위 캐시
+            String readmeKey = "repo:readme:" + owner + "/" + repo;
+            String structureKey = "repo:structure:" + owner + "/" + repo;
+
+            String readme = redisTemplate.opsForValue().get(readmeKey);
+            String structure = redisTemplate.opsForValue().get(structureKey);
+
+            if (readme == null || structure == null) {
+                GitHubHelperService.RepoMeta meta = githubHelperService.fetchRepoMetadata(owner, repo);
+                if (readme == null) {
+                    readme = meta.readme();
+                    redisTemplate.opsForValue().set(readmeKey, readme, Duration.ofDays(1));
+                }
+                if (structure == null) {
+                    structure = meta.structure();
+                    redisTemplate.opsForValue().set(structureKey, structure, Duration.ofDays(1));
+                }
+            }
+
+            String[] issueData = githubHelperService.fetchIssueData(owner, repo, issueNumber);
+            String title = issueData[0];
+            String body = issueData[1];
+
             long githubEnd = System.currentTimeMillis();
-            log.info("[GitHub API 총 호출 시간] {}ms", (githubEnd - githubStart));
+            log.info("[GitHub 데이터 로딩 시간] {}ms", githubEnd - githubStart);
 
             long geminiStart = System.currentTimeMillis();
-
             String prompt = promptBuilder.buildPrompt(title, body, readme, structure);
             IssueGuideResponseDTO geminiResponse = chatClient.call(prompt);
             long geminiEnd = System.currentTimeMillis();
-            log.info("[Gemini 응답 처리 시간] {}ms", (geminiEnd - geminiStart));
+            log.info("[Gemini 호출 및 응답 파싱 시간] {}ms", geminiEnd - geminiStart);
 
-            return new String[]{title, body, geminiResponse.getDescription(), geminiResponse.getSolution(), geminiResponse.getCaution()};
-        }).thenCompose(arr ->
-                issueListService.classifyWithAI(arr[0], arr[1])
-                        .thenApply(tag ->
-                                IssueGuideResponseDTO.builder()
-                                        .title(arr[0])
-                                        .difficulty(tag.name().toLowerCase())
-                                        .description(arr[2])
-                                        .solution(arr[3])
-                                        .caution(arr[4])
-                                        .build()
-                        )
-        ).whenComplete((res, ex) -> {
+            return new Object[]{issueUrl, title, body, geminiResponse};
+        }).thenCompose(arr -> {
+            String issueId = (String) arr[0];
+            String title = (String) arr[1];
+            String body = (String) arr[2];
+            IssueGuideResponseDTO gemini = (IssueGuideResponseDTO) arr[3];
+
+            long aiStart = System.currentTimeMillis();
+            String tagCached = redisTemplate.opsForValue().get("issue:" + issueId);
+            if (tagCached != null) {
+                Tag tag = Tag.valueOf(tagCached.toUpperCase());
+                log.info("[AI 분류 캐시 HIT] 시간: {}ms", System.currentTimeMillis() - aiStart);
+                return CompletableFuture.completedFuture(
+                        buildAndCacheLLMResponse(issueId, title, tag, gemini)
+                );
+            }
+
+            return issueListService.classifyWithAI(title, body)
+                    .thenApply(tag -> {
+                        redisTemplate.opsForValue().set("issue:" + issueId, tag.name().toLowerCase(), Duration.ofDays(7));
+                        log.info("[AI 분류 수행 시간] {}ms", System.currentTimeMillis() - aiStart);
+                        return buildAndCacheLLMResponse(issueId, title, tag, gemini);
+                    });
+        }).whenComplete((res, ex) -> {
             long totalEnd = System.currentTimeMillis();
             if (ex != null) {
-                log.error("[generateGuide 실패] 에러: {}", ex.getMessage(), ex);
+                log.error("[generateGuide 에러 발생]: {}", ex.getMessage(), ex);
             }
-            log.info("[generateGuide 전체 소요 시간] {}ms", (totalEnd - totalStart));
+            log.info("[전체 generateGuide 처리 시간] {}ms", totalEnd - totalStart);
         });
+    }
+
+    private IssueGuideResponseDTO buildAndCacheLLMResponse(String issueId, String title, Tag tag, IssueGuideResponseDTO gemini) {
+        IssueGuideResponseDTO finalDTO = IssueGuideResponseDTO.builder()
+                .title(title)
+                .difficulty(tag.name().toLowerCase())
+                .description(gemini.getDescription())
+                .solution(gemini.getSolution())
+                .caution(gemini.getCaution())
+                .build();
+
+        try {
+            String json = objectMapper.writeValueAsString(finalDTO);
+            redisTemplate.opsForValue().set("llm:guide:" + issueId, json, Duration.ofHours(6));
+        } catch (Exception e) {
+            log.warn("LLM 결과 캐싱 실패: {}", e.getMessage());
+        }
+
+        return finalDTO;
     }
 }
