@@ -153,7 +153,7 @@ public class IssueListServiceImpl implements IssueListService {
                             default -> Tag.MISC;
                         };
                     } catch (Exception e) {
-                        log.error("응답 파싱 실패", e);
+                        log.error("AI 응답 파싱 실패 - result: {}", result, e);
                         return Tag.MISC;
                     }
                 })

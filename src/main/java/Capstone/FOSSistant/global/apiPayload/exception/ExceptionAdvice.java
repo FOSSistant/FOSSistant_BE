@@ -129,6 +129,7 @@ public class ExceptionAdvice extends ResponseEntityExceptionHandler {
     public ResponseEntity<Object> handleCompletionException(CompletionException e, WebRequest request) {
         Throwable cause = e.getCause();
 
+        // 커스텀 예외인 경우
         if (cause instanceof GeneralException generalException) {
             return handleExceptionInternal(
                     generalException,
@@ -138,7 +139,21 @@ public class ExceptionAdvice extends ResponseEntityExceptionHandler {
             );
         }
 
-        log.error("비동기 예외 처리 실패: {}", cause.getMessage(), cause);
+        // ClassificationException 도 직접 처리
+        if (cause instanceof ClassificationException classificationException) {
+            APiResponse<Object> body = APiResponse.onFailure(
+                    classificationException.getErrorReason().getCode(),
+                    classificationException.getErrorReason().getMessage(),
+                    null
+            );
+
+            return ResponseEntity
+                    .status(classificationException.getErrorReason().getHttpStatus())
+                    .body(body);
+        }
+
+        // 기타 예외
+        log.error("CompletionException 처리 실패", cause);
         return handleExceptionInternalFalse(
                 e,
                 ErrorStatus._INTERNAL_SERVER_ERROR,
