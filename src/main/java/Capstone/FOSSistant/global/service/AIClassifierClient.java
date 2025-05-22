@@ -1,6 +1,8 @@
 package Capstone.FOSSistant.global.service;
 
-
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
@@ -20,6 +22,7 @@ import java.util.concurrent.TimeoutException;
 public class AIClassifierClient {
 
     private final WebClient webClient;
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     public Mono<String> classify(String title, String body) {
         String shortBody = (body == null || body.isBlank()) ? "(no description provided)" : body;
@@ -28,12 +31,12 @@ public class AIClassifierClient {
         long start = System.currentTimeMillis();
 
         Map<String, Object> payload = Map.of(
+                "model", "fossistant-v0.1.0",  // ✅ 새로 요구되는 model 필드
                 "issues", List.of(Map.of(
                         "title", title,
                         "body", shortBody
                 ))
         );
-
 
         return webClient.post()
                 .uri("https://api.ucyang.com/v1/fossistant/difficulty/")
@@ -52,15 +55,29 @@ public class AIClassifierClient {
                 })
                 .onErrorResume(TimeoutException.class, e -> {
                     log.warn("AI Timeout 발생", e);
-                    return Mono.just("{\"difficulty\": \"misc\"}");
+                    return Mono.just("{\"results\": [{\"difficulty\": \"misc\", \"score\": 0.0}]}");
                 })
                 .onErrorResume(WebClientResponseException.class, e -> {
                     log.error("AI 응답 에러: {}", e.getMessage(), e);
-                    return Mono.just("{\"difficulty\": \"misc\"}");
+                    return Mono.just("{\"results\": [{\"difficulty\": \"misc\", \"score\": 0.0}]}");
                 })
                 .onErrorResume(Exception.class, e -> {
                     log.error("AI 기타 예외 발생", e);
-                    return Mono.just("{\"difficulty\": \"misc\"}");
+                    return Mono.just("{\"results\": [{\"difficulty\": \"misc\", \"score\": 0.0}]}");
                 });
+    }
+
+    // 결과 파싱 헬퍼 (선택적)
+    public String extractDifficultyFromResult(String resultJson) {
+        try {
+            JsonNode root = objectMapper.readTree(resultJson);
+            JsonNode results = root.get("results");
+            if (results != null && results.isArray() && results.size() > 0) {
+                return results.get(0).get("difficulty").asText().toLowerCase();
+            }
+        } catch (Exception e) {
+            log.error("AI 응답 파싱 실패 - result: {}", resultJson, e);
+        }
+        return "misc";
     }
 }

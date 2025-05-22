@@ -145,13 +145,28 @@ public class IssueListServiceImpl implements IssueListService {
                     log.info("[AI 분류 소요 시간] {}ms", (end - start));
 
                     try {
-                        String diff = new ObjectMapper().readTree(result).get("difficulty").asText().toLowerCase();
-                        return switch (diff) {
-                            case "easy" -> Tag.EASY;
-                            case "medium" -> Tag.MEDIUM;
-                            case "hard" -> Tag.HARD;
-                            default -> Tag.MISC;
-                        };
+                        ObjectMapper objectMapper = new ObjectMapper();
+                        var root = objectMapper.readTree(result);
+                        var results = root.get("results");
+
+                        if (results != null && results.isArray() && results.size() > 0) {
+                            var firstResult = results.get(0);
+                            var difficultyNode = firstResult.get("difficulty");
+
+                            if (difficultyNode != null && !difficultyNode.isNull()) {
+                                String diff = difficultyNode.asText().toLowerCase();
+                                return switch (diff) {
+                                    case "easy" -> Tag.EASY;
+                                    case "medium" -> Tag.MEDIUM;
+                                    case "hard" -> Tag.HARD;
+                                    default -> Tag.MISC;
+                                };
+                            }
+                        }
+
+                        log.warn("AI 응답에 유효한 difficulty가 없음 - result: {}", result);
+                        return Tag.MISC;
+
                     } catch (Exception e) {
                         log.error("AI 응답 파싱 실패 - result: {}", result, e);
                         return Tag.MISC;
@@ -159,4 +174,5 @@ public class IssueListServiceImpl implements IssueListService {
                 })
                 .toFuture();
     }
+
 }
