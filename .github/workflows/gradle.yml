@@ -84,4 +84,9 @@ jobs:
               -e SPRING_REDIS_HOST="redis" \
               -e SPRING_REDIS_PORT="6379" \
               -e SPRING_GITHUB_TOKEN="${{ secrets.HUB_TOKEN }}" \
+              -e JWT_SECRET_KEY="${{ secrets.JWT_SECRET_KEY }}" \
+              -e JWT_ACCESS_TOKEN_TIME="${{ secrets.JWT_ACCESS_TOKEN_TIME }}" \
+              -e JWT_REFRESH_TOKEN_TIME="${{ secrets.JWT_REFRESH_TOKEN_TIME }}" \
+              -e SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GITHUB_CLIENT_ID="${{ secrets.CLIENT_ID }}" \
+              -e SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GITHUB_CLIENT_SECRET="${{ secrets.CLIENT_SECRET }}" \
               ${{ secrets.DOCKER_USERNAME }}/fossistant:latest
