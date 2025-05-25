@@ -27,7 +27,7 @@ spring:
 
   data:
     redis:
-      host: redis # ※운영 환경에서는 localhost → redis
+      host: localhost # ※운영 환경에서는 localhost → redis
       port: 6379
 
   gemini:
@@ -37,10 +37,25 @@ spring:
 
   github:
     token: ${GITHUB_TOKEN}
-#jwt:
-#  secret: ${JWT_SECRET_KEY}
-#  access-token-validity: ${JWT_ACCESS_TOKEN_TIME}
-#  refresh-token-validity: ${JWT_REFRESH_TOKEN_TIME}
+
+
+  security:
+    oauth2:
+      client:
+        registration:
+          github:
+            client-id: ${GITHUB_CLIENT_ID}
+            client-secret: ${GITHUB_CLIENT_SECRET}
+        provider:
+          github:
+            authorization-uri: https://github.com/login/oauth/authorize
+            token-uri: https://github.com/login/oauth/access_token
+            user-info-uri: https://api.github.com/user
+            user-name-attribute: id
+jwt:
+  secret: ${JWT_SECRET_KEY}
+  access-token-validity: ${JWT_ACCESS_TOKEN_TIME}
+  refresh-token-validity: ${JWT_REFRESH_TOKEN_TIME}
 
 logging:
   level:

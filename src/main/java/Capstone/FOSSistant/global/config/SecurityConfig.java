@@ -1,5 +1,8 @@
 package Capstone.FOSSistant.global.config;
 
+import Capstone.FOSSistant.global.security.filter.JwtRequestFilter;
+import Capstone.FOSSistant.global.security.principal.PrincipalDetailsService;
+import Capstone.FOSSistant.global.security.provider.JwtTokenProvider;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -22,8 +25,8 @@ import java.util.List;
 @EnableWebSecurity
 @RequiredArgsConstructor
 public class SecurityConfig {
-//    private final JwtTokenProvider jwtTokenProvider;
-//    private final PrincipalDetailsService principalDetailsService;
+    private final JwtTokenProvider jwtTokenProvider;
+    private final PrincipalDetailsService principalDetailsService;
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
@@ -40,7 +43,7 @@ public class SecurityConfig {
                                 .requestMatchers("/", "/api-docs/**", "/api-docs/swagger-config/*", "/swagger-ui/*", "/swagger-ui/**", "/v3/api-docs/**", "/image/upload", "/image/delete").permitAll()
                                 .anyRequest().authenticated()
                 )
-//                .addFilterBefore(new JwtRequestFilter(jwtTokenProvider, principalDetailsService), UsernamePasswordAuthenticationFilter.class)
+                .addFilterBefore(new JwtRequestFilter(jwtTokenProvider, principalDetailsService), UsernamePasswordAuthenticationFilter.class)
                 .build();
     }
 

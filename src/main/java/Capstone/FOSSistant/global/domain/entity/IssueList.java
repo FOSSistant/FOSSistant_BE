@@ -5,6 +5,9 @@ import Capstone.FOSSistant.global.domain.enums.Tag;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.util.ArrayList;
+import java.util.List;
+
 @Entity
 @Getter
 @Setter
@@ -19,4 +22,8 @@ public class IssueList extends BaseEntity {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 10)
     private Tag difficulty;
+
+    @OneToMany(mappedBy = "issue", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<IssueFeedback> feedbackList = new ArrayList<>();
+
 }

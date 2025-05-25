@@ -12,8 +12,12 @@ import org.springframework.http.HttpStatus;
 public enum SuccessStatus implements BaseCode {
 
     //멤버 관련
-    MEMBER_CREATED(HttpStatus.CREATED, "MEMBER_1000", "회원가입이 완료되었습니다."),
-    MEMBER_LOGIN_OK(HttpStatus.OK, "MEMBER_1001", "로그인이 완료되었습니다."),
+    MEMBER_CREATED(HttpStatus.CREATED, "MEMBER_100_001", "회원가입이 완료되었습니다."),
+    MEMBER_LOGIN_OK(HttpStatus.OK, "MEMBER_100_002", "로그인이 완료되었습니다."),
+    ACCESSTOKEN_OK(HttpStatus.OK, "MEMBER_100_003", "액세스 토큰이 재발급 되었습니다."),
+    MEMBER_LOGOUT_OK(HttpStatus.OK, "MEMBER_100_004", "로그아웃이 완료되었습니다."),
+    MEMBER_WITHDRAW_OK(HttpStatus.OK, "MEMBER_100_005", "회원 탈퇴가 완료되었습니다."),
+
 
     // 이슈 관련
     ISSUE_TAGGING_OK(HttpStatus.OK, "ISSUE_200_001", "이슈 난이도 태깅 성공"),
