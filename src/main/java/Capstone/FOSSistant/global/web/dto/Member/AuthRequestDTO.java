@@ -9,7 +9,7 @@ public class AuthRequestDTO {
 
     @Getter
     public static class RefreshToken {
-        @JsonProperty("refresh_token")
+        @JsonProperty("refreshToken")
         String refreshToken;
     }
 
