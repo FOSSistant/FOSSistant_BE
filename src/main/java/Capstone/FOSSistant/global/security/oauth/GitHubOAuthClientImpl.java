@@ -9,10 +9,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
 import org.springframework.stereotype.Component;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.List;
-import java.util.Map;
 
 @Slf4j
 @Component
@@ -37,25 +38,30 @@ public class GitHubOAuthClientImpl implements GitHubOAuthClient {
     @Override
     public String getAccessTokenFromCode(String code) {
         HttpHeaders headers = new HttpHeaders();
-        headers.setAccept(List.of(MediaType.APPLICATION_JSON));
         headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
+        headers.setAccept(List.of(MediaType.APPLICATION_JSON));
 
-        HttpEntity<Map<String, String>> request = new HttpEntity<>(
-                Map.of(
-                        "client_id", clientId,
-                        "client_secret", clientSecret,
-                        "code", code
-                ), headers);
+        MultiValueMap<String, String> body = new LinkedMultiValueMap<>();
+        body.add("client_id", clientId);
+        body.add("client_secret", clientSecret);
+        body.add("code", code);
+
+        HttpEntity<MultiValueMap<String, String>> request = new HttpEntity<>(body, headers);
 
         try {
             ResponseEntity<JsonNode> response = restTemplate.postForEntity(tokenUri, request, JsonNode.class);
+
+            log.info("🔐 GitHub 토큰 응답: {}", response.getBody()); // 👈 응답 로그 출력
+
             String accessToken = response.getBody().path("access_token").asText();
             if (accessToken == null || accessToken.isBlank()) {
+                log.error("❌ GitHub에서 access_token이 비어있습니다. 응답: {}", response.getBody());
                 throw new AuthException(ErrorStatus.AUTH_GITHUB_FAIL);
             }
+
             return accessToken;
         } catch (Exception e) {
-            log.error("GitHub 액세스 토큰 요청 실패", e);
+            log.error("❌ GitHub 액세스 토큰 요청 실패: {}", e.getMessage(), e); // 메시지 포함
             throw new AuthException(ErrorStatus.AUTH_GITHUB_FAIL);
         }
     }
