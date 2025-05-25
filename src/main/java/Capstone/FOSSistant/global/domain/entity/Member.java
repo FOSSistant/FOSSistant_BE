@@ -1,5 +1,6 @@
 package Capstone.FOSSistant.global.domain.entity;
 
+import Capstone.FOSSistant.global.domain.common.BaseEntity;
 import Capstone.FOSSistant.global.domain.enums.Level;
 import Capstone.FOSSistant.global.domain.enums.Tag;
 import jakarta.persistence.*;
@@ -13,7 +14,7 @@ import java.util.List;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor
 @Builder
-public class Member {
+public class Member extends BaseEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -33,4 +34,8 @@ public class Member {
 
     @OneToMany(mappedBy = "member", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<IssueFeedback> feedbackList = new ArrayList<>();
+
+    public void updateLevel(Level newLevel) {
+        this.level = newLevel;
+    }
 }

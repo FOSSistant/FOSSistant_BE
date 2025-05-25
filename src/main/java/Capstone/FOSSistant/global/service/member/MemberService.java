@@ -1,6 +1,7 @@
 package Capstone.FOSSistant.global.service.member;
 
 import Capstone.FOSSistant.global.domain.entity.Member;
+import Capstone.FOSSistant.global.domain.enums.Level;
 import Capstone.FOSSistant.global.web.dto.Member.AuthResponseDTO;
 
 public interface MemberService {
@@ -9,4 +10,5 @@ public interface MemberService {
     String reissueAccessToken(String refreshToken);
     void logout(Member member);
     void withdraw(Member member);
+    void updateLevel(Member member, Level level);
 }

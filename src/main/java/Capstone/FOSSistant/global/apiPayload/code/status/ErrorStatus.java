@@ -40,6 +40,8 @@ public enum ErrorStatus implements BaseErrorCode {
     MEMBER_WRONG_PASSWORD(HttpStatus.BAD_REQUEST, "MEMBER_1008", "비밀번호 형식이 올바르지 않습니다."),
     MEMBER_EMAIL_ALREADY_EXISTS(HttpStatus.CONFLICT, "MEMBER_1009", "이미 가입된 이메일입니다."),
     MEMBER_NICKNAME_ALREADY_EXISTS(HttpStatus.CONFLICT, "MEMBER_1010", "이미 존재하는 닉네임입니다."),
+    MEMBER_LEVEL_BLANK(HttpStatus.CONFLICT, "MEMBER_1011", "레벨은 필수입니다."),
+
 
     //서버 에러
     REDIS_CONNECTION_FAIL(HttpStatus.INTERNAL_SERVER_ERROR, "INFRA_500_001", "Redis 연결 실패"),

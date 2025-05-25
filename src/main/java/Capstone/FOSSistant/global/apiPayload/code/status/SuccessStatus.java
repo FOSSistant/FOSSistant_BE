@@ -17,6 +17,8 @@ public enum SuccessStatus implements BaseCode {
     ACCESSTOKEN_OK(HttpStatus.OK, "MEMBER_100_003", "액세스 토큰이 재발급 되었습니다."),
     MEMBER_LOGOUT_OK(HttpStatus.OK, "MEMBER_100_004", "로그아웃이 완료되었습니다."),
     MEMBER_WITHDRAW_OK(HttpStatus.OK, "MEMBER_100_005", "회원 탈퇴가 완료되었습니다."),
+    MEMBER_LEVEL_OK(HttpStatus.OK, "MEMBER_100_006", "회원의 레벨 설정이 완료되었습니다."),
+
 
 
     // 이슈 관련

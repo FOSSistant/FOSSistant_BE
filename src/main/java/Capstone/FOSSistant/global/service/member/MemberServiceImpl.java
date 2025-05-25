@@ -107,4 +107,17 @@ public class MemberServiceImpl implements MemberService {
         }
         memberRepository.delete(member);
     }
+
+    @Override
+    @Transactional
+    public void updateLevel(Member member, Level level) {
+        if (level == null) {
+            throw new MemberException(ErrorStatus.MEMBER_LEVEL_BLANK);
+        }
+
+        Member found = memberRepository.findById(member.getMemberId())
+                .orElseThrow(() -> new MemberException(ErrorStatus.MEMBER_NOT_FOUND));
+
+        found.updateLevel(level);
+    }
 }
