@@ -74,7 +74,7 @@ jobs:
             echo "✅ Pulling latest application image..."
             sudo docker pull ${{ secrets.DOCKER_USERNAME }}/fossistant:latest
 
-            echo "✅ Starting application container..."
+            echo "✅ Starting application container...."
             sudo docker run -d --name fossistant-container -p 8080:8080 \
               --network my-network \
               -e SPRING_DATASOURCE_URL="jdbc:mysql://fossistantdb.mysql.database.azure.com:3306/fossistantdb?sslMode=REQUIRED" \
