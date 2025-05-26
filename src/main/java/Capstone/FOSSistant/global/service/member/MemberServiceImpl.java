@@ -138,6 +138,8 @@ public class MemberServiceImpl implements MemberService {
                         Member.builder()
                                 .githubId("DEV_" + memberId)          // dev용 식별자
                                 .email("dev+" + memberId + "@example.com")
+                                .nickname("dev" + memberId)
+                                .profileImage("dev" + memberId)
                                 .level(Level.BEGINNER)
                                 .build()
                 ));

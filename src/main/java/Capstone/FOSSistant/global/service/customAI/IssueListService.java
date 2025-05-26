@@ -1,4 +1,4 @@
-package Capstone.FOSSistant.global.service;
+package Capstone.FOSSistant.global.service.customAI;
 
 import Capstone.FOSSistant.global.web.dto.IssueList.IssueListRequestDTO;
 import Capstone.FOSSistant.global.web.dto.IssueList.IssueListResponseDTO;

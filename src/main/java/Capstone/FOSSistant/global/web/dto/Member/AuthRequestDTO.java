@@ -32,6 +32,7 @@ public class AuthRequestDTO {
     @Getter @Setter
     public static class DevTokenRequest {
         @NotNull
+        @Schema(description = "사용자Id", example = "1")
         private Long memberId;
     }
 

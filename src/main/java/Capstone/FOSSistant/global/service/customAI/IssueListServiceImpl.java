@@ -1,4 +1,4 @@
-package Capstone.FOSSistant.global.service;
+package Capstone.FOSSistant.global.service.customAI;
 
 import Capstone.FOSSistant.global.aop.annotation.MeasureExecutionTime;
 import Capstone.FOSSistant.global.apiPayload.code.status.ErrorStatus;
@@ -6,6 +6,7 @@ import Capstone.FOSSistant.global.apiPayload.exception.ClassificationException;
 import Capstone.FOSSistant.global.converter.IssueListConverter;
 import Capstone.FOSSistant.global.domain.enums.Tag;
 import Capstone.FOSSistant.global.repository.IssueListRepository;
+import Capstone.FOSSistant.global.service.GitHubHelperService;
 import Capstone.FOSSistant.global.web.dto.IssueList.IssueListRequestDTO;
 import Capstone.FOSSistant.global.web.dto.IssueList.IssueListResponseDTO;
 import com.fasterxml.jackson.databind.ObjectMapper;

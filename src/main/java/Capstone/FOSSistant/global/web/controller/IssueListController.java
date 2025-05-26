@@ -6,7 +6,7 @@ import Capstone.FOSSistant.global.apiPayload.code.status.ErrorStatus;
 import Capstone.FOSSistant.global.apiPayload.code.status.SuccessStatus;
 import Capstone.FOSSistant.global.domain.entity.Member;
 import Capstone.FOSSistant.global.security.handler.annotation.AuthUser;
-import Capstone.FOSSistant.global.service.IssueListService;
+import Capstone.FOSSistant.global.service.customAI.IssueListService;
 import Capstone.FOSSistant.global.web.dto.IssueList.IssueListRequestDTO;
 import Capstone.FOSSistant.global.web.dto.IssueList.IssueListResponseDTO;
 import Capstone.FOSSistant.global.web.dto.util.custom.ApiErrorCodeExamples;

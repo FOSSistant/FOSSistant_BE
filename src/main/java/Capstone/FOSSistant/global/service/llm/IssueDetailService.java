@@ -1,23 +1,34 @@
 package Capstone.FOSSistant.global.service.llm;
 
 import Capstone.FOSSistant.global.aop.annotation.MeasureExecutionTime;
+import Capstone.FOSSistant.global.apiPayload.code.status.ErrorStatus;
+import Capstone.FOSSistant.global.apiPayload.exception.GeneralException;
+import Capstone.FOSSistant.global.apiPayload.exception.MemberException;
+import Capstone.FOSSistant.global.domain.entity.IssueFeedback;
+import Capstone.FOSSistant.global.domain.entity.IssueList;
+import Capstone.FOSSistant.global.domain.entity.Member;
 import Capstone.FOSSistant.global.domain.enums.Tag;
+import Capstone.FOSSistant.global.repository.IssueFeedbackRepository;
+import Capstone.FOSSistant.global.repository.IssueListRepository;
 import Capstone.FOSSistant.global.service.GitHubHelperService;
-import Capstone.FOSSistant.global.service.IssueListServiceImpl;
+import Capstone.FOSSistant.global.service.customAI.IssueListServiceImpl;
 import Capstone.FOSSistant.global.web.dto.IssueGuide.IssueGuideResponseDTO;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
 
+import static Capstone.FOSSistant.global.apiPayload.code.status.ErrorStatus.*;
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class GeminiGuideService {
+public class IssueDetailService {
 
     private final PromptBuilder promptBuilder;
     private final GeminiChatClient chatClient;
@@ -25,6 +36,9 @@ public class GeminiGuideService {
     private final IssueListServiceImpl issueListService;
     private final StringRedisTemplate redisTemplate;
     private final ObjectMapper objectMapper;
+    private final IssueFeedbackRepository feedbackRepository;
+    private final IssueListRepository issueListRepository;
+
 
     @MeasureExecutionTime
     public CompletableFuture<IssueGuideResponseDTO> generateGuide(String issueUrl) {
@@ -132,5 +146,33 @@ public class GeminiGuideService {
         }
 
         return finalDTO;
+    }
+
+    @Transactional
+    public void upsertFeedback(Member member, String issueId, Tag feedbackTag) {
+        if (member == null || member.getMemberId() == null) {
+            throw new MemberException(MEMBER_NOT_FOUND);
+        }
+
+        IssueList issue = issueListRepository.findById(issueId)
+                .orElseGet(() -> issueListRepository.save(
+                        IssueList.builder()
+                                .id(issueId)
+                                .difficulty(Tag.MISC)
+                                .build()
+                ));
+
+        IssueFeedback fb = feedbackRepository
+                .findByMemberAndIssue(member, issue)
+                .orElseGet(() -> {
+                    IssueFeedback newFb = IssueFeedback.builder()
+                            .member(member)
+                            .issue(issue)
+                            .build();
+                    return newFb;
+                });
+
+        fb.setFeedbackTag(feedbackTag);
+        feedbackRepository.save(fb);
     }
 }

@@ -1,6 +1,5 @@
-package Capstone.FOSSistant.global.service;
+package Capstone.FOSSistant.global.service.customAI;
 
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -31,7 +30,7 @@ public class AIClassifierClient {
         long start = System.currentTimeMillis();
 
         Map<String, Object> payload = Map.of(
-                "model", "fossistant-v0.1.0",  // ✅ 새로 요구되는 model 필드
+                "model", "fossistant-v0.1.0",
                 "issues", List.of(Map.of(
                         "title", title,
                         "body", shortBody

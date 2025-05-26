@@ -27,6 +27,7 @@ public enum ErrorStatus implements BaseErrorCode {
 
 
     //서버 에러
+    ISSUE_NOT_FOUND(HttpStatus.INTERNAL_SERVER_ERROR, "SERVER_500_001", "이슈를 찾지 못함"),
     REDIS_CONNECTION_FAIL(HttpStatus.INTERNAL_SERVER_ERROR, "INFRA_500_001", "Redis 연결 실패"),
     DB_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "INFRA_500_002", "DB 처리 중 에러 발생"),
     NOT_CONTAIN_TOKEN(HttpStatus.INTERNAL_SERVER_ERROR, "INFRA_500_003", "Redis에 토큰이 없음."),
