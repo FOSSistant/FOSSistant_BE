@@ -11,4 +11,5 @@ public interface MemberService {
     void logout(Member member);
     void withdraw(Member member);
     void updateLevel(Member member, Level level);
+    AuthResponseDTO.OAuthResponse getServerAccessToken(Long memberId);
 }

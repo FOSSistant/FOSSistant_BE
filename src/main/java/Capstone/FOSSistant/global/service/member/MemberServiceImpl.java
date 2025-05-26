@@ -1,6 +1,8 @@
 package Capstone.FOSSistant.global.service.member;
 
+import Capstone.FOSSistant.global.apiPayload.APiResponse;
 import Capstone.FOSSistant.global.apiPayload.code.status.ErrorStatus;
+import Capstone.FOSSistant.global.apiPayload.code.status.SuccessStatus;
 import Capstone.FOSSistant.global.apiPayload.exception.AuthException;
 import Capstone.FOSSistant.global.apiPayload.exception.MemberException;
 import Capstone.FOSSistant.global.domain.entity.Member;
@@ -119,5 +121,30 @@ public class MemberServiceImpl implements MemberService {
                 .orElseThrow(() -> new MemberException(ErrorStatus.MEMBER_NOT_FOUND));
 
         found.updateLevel(level);
+    }
+
+
+    @Override
+    public AuthResponseDTO.OAuthResponse getServerAccessToken(Long memberId) {
+
+        Member member = memberRepository.findById(memberId)
+                .orElseGet(() -> memberRepository.save(
+                        Member.builder()
+                                .githubId("DEV_" + memberId)          // dev용 식별자
+                                .email("dev+" + memberId + "@example.com")
+                                .level(Level.BEGINNER)
+                                .build()
+                ));
+
+        String access = jwtTokenProvider.createAccessToken(memberId);
+        String refresh = jwtTokenProvider.createRefreshToken(memberId);
+
+        // 기존 로직처럼 Redis에 저장
+        redisTemplate.opsForValue()
+                .set("refresh:" + memberId, refresh, Duration.ofDays(7));
+        return AuthResponseDTO.OAuthResponse.builder()
+                        .accessToken(access)
+                        .refreshToken(refresh)
+                        .build();
     }
 }

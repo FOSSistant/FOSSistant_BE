@@ -6,10 +6,10 @@ import Capstone.FOSSistant.global.domain.entity.Member;
 import Capstone.FOSSistant.global.security.handler.annotation.AuthUser;
 import Capstone.FOSSistant.global.service.member.MemberService;
 import Capstone.FOSSistant.global.web.dto.Member.AuthRequestDTO;
-import io.lettuce.core.dynamic.annotation.Param;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
@@ -28,7 +28,7 @@ public class MemberController {
     @Operation(summary = "레벨 설정 API", description = "오픈소스 기여 여부를 입력하는 API")
     public APiResponse<Void> updateLevel(
             @AuthUser @Parameter(hidden = true) Member member,
-            @RequestBody AuthRequestDTO.UpdateLevelRequest request
+            @Valid @RequestBody AuthRequestDTO.UpdateLevelRequest request
     ) {
         memberService.updateLevel(member, request.getLevel());
         return APiResponse.onSuccess(SuccessStatus.MEMBER_LEVEL_OK, null);
