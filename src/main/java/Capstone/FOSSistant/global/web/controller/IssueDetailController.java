@@ -42,6 +42,7 @@ import Capstone.FOSSistant.global.domain.entity.Member;
 import Capstone.FOSSistant.global.security.handler.annotation.AuthUser;
 import Capstone.FOSSistant.global.service.llm.IssueDetailService;
 import Capstone.FOSSistant.global.web.dto.IssueGuide.IssueFeedbackRequestDTO;
+import Capstone.FOSSistant.global.web.dto.IssueGuide.IssueFeedbackResponseDTO;
 import Capstone.FOSSistant.global.web.dto.IssueGuide.IssueGuideRequestDTO;
 import Capstone.FOSSistant.global.web.dto.IssueGuide.IssueGuideResponseDTO;
 import Capstone.FOSSistant.global.web.dto.util.custom.ApiErrorCodeExamples;
@@ -87,5 +88,24 @@ public class IssueDetailController {
                 request.getFeedbackTag()
         );
         return APiResponse.onSuccess(SuccessStatus.ISSUE_FEEDBACK_OK, null);
+    }
+
+    @GetMapping("/feedback")
+    @Operation(summary = "내가 남긴 피드백 조회", description = "issueId에 대해 내가 남긴 난이도 피드백을 반환")
+    public APiResponse<IssueFeedbackResponseDTO.Feedback> getMyFeedback(
+            @AuthUser @Parameter(hidden = true) Member member,
+            @RequestParam String issueId
+    ) {
+        Capstone.FOSSistant.global.domain.enums.Tag tag = issueDetailService.getMyFeedback(member, issueId);
+        if (tag == null) {
+            return APiResponse.onSuccess(SuccessStatus.ISSUE_FEEDBACK_FOUND, null);
+        }
+        return APiResponse.onSuccess(
+                SuccessStatus.ISSUE_FEEDBACK_FOUND,
+                IssueFeedbackResponseDTO.Feedback.builder()
+                        .issueId(issueId)
+                        .feedbackTag(tag)
+                        .build()
+        );
     }
 }

@@ -175,4 +175,12 @@ public class IssueDetailService {
         fb.setFeedbackTag(feedbackTag);
         feedbackRepository.save(fb);
     }
+
+    @Transactional(readOnly = true)
+    public Tag getMyFeedback(Member member, String issueId) {
+        return feedbackRepository
+                .findByMemberAndIssue_Id(member, issueId)
+                .map(IssueFeedback::getFeedbackTag)
+                .orElse(null);
+    }
 }

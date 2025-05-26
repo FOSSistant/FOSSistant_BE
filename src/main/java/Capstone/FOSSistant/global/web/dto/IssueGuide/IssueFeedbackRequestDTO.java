@@ -19,4 +19,7 @@ public class IssueFeedbackRequestDTO {
         @NotNull(message = "feedbackTag는 필수입니다.")
         private Tag feedbackTag;
     }
+
+
+
 }
