@@ -3,7 +3,6 @@ package Capstone.FOSSistant.global.security.oauth;
 import Capstone.FOSSistant.global.apiPayload.code.status.ErrorStatus;
 import Capstone.FOSSistant.global.apiPayload.exception.AuthException;
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -22,18 +21,14 @@ public class GitHubOAuthClientImpl implements GitHubOAuthClient {
 
     @Value("${spring.security.oauth2.client.registration.github.client-id}")
     private String clientId;
-
     @Value("${spring.security.oauth2.client.registration.github.client-secret}")
     private String clientSecret;
-
     @Value("${spring.security.oauth2.client.provider.github.token-uri}")
     private String tokenUri;
-
     @Value("${spring.security.oauth2.client.provider.github.user-info-uri}")
     private String userInfoUri;
 
     private final RestTemplate restTemplate;
-    private final ObjectMapper objectMapper;
 
     @Override
     public String getAccessTokenFromCode(String code) {
@@ -41,27 +36,28 @@ public class GitHubOAuthClientImpl implements GitHubOAuthClient {
         headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
         headers.setAccept(List.of(MediaType.APPLICATION_JSON));
 
-        MultiValueMap<String, String> body = new LinkedMultiValueMap<>();
-        body.add("client_id", clientId);
-        body.add("client_secret", clientSecret);
-        body.add("code", code);
+        MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
+        form.add("client_id",     clientId);
+        form.add("client_secret", clientSecret);
+        form.add("code",          code);
 
-        HttpEntity<MultiValueMap<String, String>> request = new HttpEntity<>(body, headers);
+        HttpEntity<MultiValueMap<String, String>> req = new HttpEntity<>(form, headers);
 
         try {
-            ResponseEntity<JsonNode> response = restTemplate.postForEntity(tokenUri, request, JsonNode.class);
+            ResponseEntity<JsonNode> resp = restTemplate.postForEntity(tokenUri, req, JsonNode.class);
+            JsonNode body = resp.getBody();
+            log.info("GitHub 토큰 응답: {}", body);
 
-            log.info("🔐 GitHub 토큰 응답: {}", response.getBody()); // 👈 응답 로그 출력
-
-            String accessToken = response.getBody().path("access_token").asText();
+            String accessToken = body.path("access_token").asText(null);
             if (accessToken == null || accessToken.isBlank()) {
-                log.error("❌ GitHub에서 access_token이 비어있습니다. 응답: {}", response.getBody());
+                log.error("GitHub에서 access_token이 비어있습니다. 전체 응답: {}", body);
                 throw new AuthException(ErrorStatus.AUTH_GITHUB_FAIL);
             }
-
             return accessToken;
+        } catch (AuthException ae) {
+            throw ae;
         } catch (Exception e) {
-            log.error("❌ GitHub 액세스 토큰 요청 실패: {}", e.getMessage(), e); // 메시지 포함
+            log.error("GitHub 액세스 토큰 요청 중 에러", e);
             throw new AuthException(ErrorStatus.AUTH_GITHUB_FAIL);
         }
     }
@@ -72,25 +68,57 @@ public class GitHubOAuthClientImpl implements GitHubOAuthClient {
         headers.setBearerAuth(accessToken);
         headers.setAccept(List.of(MediaType.APPLICATION_JSON));
 
-        HttpEntity<Void> request = new HttpEntity<>(headers);
+        HttpEntity<Void> req = new HttpEntity<>(headers);
 
         try {
-            ResponseEntity<JsonNode> response = restTemplate.exchange(
+            // 1) 기본 프로필 조회
+            ResponseEntity<JsonNode> resp = restTemplate.exchange(
                     userInfoUri,
                     HttpMethod.GET,
-                    request,
+                    req,
                     JsonNode.class
             );
+            JsonNode userJson = resp.getBody();
+            log.info("GitHub 사용자 정보 응답: {}", userJson);
 
-            JsonNode userJson = response.getBody();
+            // 2) 이메일 추출
+            String email = userJson.path("email").asText("");
+            if (email.isBlank()) {
+                // 숨김 이메일 보완 조회
+                ResponseEntity<JsonNode> emailsResp = restTemplate.exchange(
+                        userInfoUri + "/emails",
+                        HttpMethod.GET,
+                        req,
+                        JsonNode.class
+                );
+                for (JsonNode emailNode : emailsResp.getBody()) {
+                    if (emailNode.path("primary").asBoolean(false)
+                            && emailNode.path("verified").asBoolean(false) == false) {
+                        continue;
+                    }
+                    if (emailNode.path("primary").asBoolean(false)
+                            && emailNode.path("verified").asBoolean(false)) {
+                        email = emailNode.path("email").asText();
+                        break;
+                    }
+                }
+            }
+
+            // 3) name 필드 우선, 없으면 login
+            String login = userJson.path("login").asText();
+            String name  = userJson.hasNonNull("name")
+                    ? userJson.get("name").asText()
+                    : login;
+
+            // 4) 프로필 이미지
+            String avatarUrl = userJson.path("avatar_url").asText("");
 
             return new GitHubUserInfo(
-                    userJson.get("id").asLong(),
-                    userJson.has("email") && !userJson.get("email").isNull() ? userJson.get("email").asText() : "",
-                    userJson.has("login") ? userJson.get("login").asText() : "",
-                    userJson.has("avatar_url") ? userJson.get("avatar_url").asText() : ""
+                    userJson.path("id").asLong(),
+                    email,
+                    name,
+                    avatarUrl
             );
-
         } catch (Exception e) {
             log.error("GitHub 사용자 정보 조회 실패", e);
             throw new AuthException(ErrorStatus.AUTH_GITHUB_FAIL);

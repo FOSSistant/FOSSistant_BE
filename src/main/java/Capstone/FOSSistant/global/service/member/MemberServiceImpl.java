@@ -11,6 +11,7 @@ import Capstone.FOSSistant.global.repository.MemberRepository;
 import Capstone.FOSSistant.global.security.oauth.GitHubOAuthClient;
 import Capstone.FOSSistant.global.security.provider.JwtTokenProvider;
 import Capstone.FOSSistant.global.web.dto.Member.AuthResponseDTO;
+import Capstone.FOSSistant.global.web.dto.Member.MemberResponseDTO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
@@ -42,31 +43,36 @@ public class MemberServiceImpl implements MemberService {
 
         // 2. access_token → 사용자 정보 조회
         GitHubOAuthClient.GitHubUserInfo userInfo = gitHubOAuthClient.getUserInfo(accessToken);
-
-        String githubId = String.valueOf(userInfo.githubId());
-        String email = (userInfo.email() == null || userInfo.email().isBlank())
+        String githubId     = String.valueOf(userInfo.githubId());
+        String email        = (userInfo.email() == null || userInfo.email().isBlank())
                 ? githubId + "@users.noreply.github.com"
                 : userInfo.email();
+        String nickname     = userInfo.nickname();
+        String profileImage = userInfo.profileImageUrl();
 
         // 3. 사용자 조회 or 생성
         Member member = memberRepository.findByGithubId(githubId)
-                .orElseGet(() -> memberRepository.save(
-                        Member.builder()
-                                .githubId(githubId)
-                                .email(email)
-                                .level(Level.BEGINNER)
-                                .build()
-                ));
+                .map(existing -> {
+                    // 이미 가입된 유저면 프로필만 업데이트
+                    existing.updateProfile(nickname, profileImage);
+                    return existing;
+                })
+                .orElseGet(() -> {
+                    // 신규 회원
+                    return memberRepository.save(Member.builder()
+                            .githubId(githubId)
+                            .email(email)
+                            .nickname(nickname)
+                            .profileImage(profileImage)
+                            .level(Level.BEGINNER)
+                            .build());
+                });
 
-        // 4. JWT 발급
-        if (member.getMemberId() == null) {
-            throw new MemberException(ErrorStatus.MEMBER_NOT_FOUND); // 또는 다른 예외
-        }
-        String accessJwt = jwtTokenProvider.createAccessToken(member.getMemberId());
+        // 4. JWT 발급 & Redis에 리프레시 토큰 저장
+        String accessJwt  = jwtTokenProvider.createAccessToken(member.getMemberId());
         String refreshJwt = jwtTokenProvider.createRefreshToken(member.getMemberId());
-
-        String key = "refresh:" + member.getMemberId();
-        redisTemplate.opsForValue().set(key, refreshJwt, Duration.ofDays(7));
+        redisTemplate.opsForValue()
+                .set("refresh:" + member.getMemberId(), refreshJwt, Duration.ofDays(7));
 
         return AuthResponseDTO.OAuthResponse.builder()
                 .accessToken(accessJwt)
@@ -146,5 +152,14 @@ public class MemberServiceImpl implements MemberService {
                         .accessToken(access)
                         .refreshToken(refresh)
                         .build();
+    }
+
+    @Override
+    public MemberResponseDTO.MemberProfileResponseDTO getProfile(Member member) {
+        return MemberResponseDTO.MemberProfileResponseDTO.builder()
+                .nickname(member.getNickname())
+                .profileImage(member.getProfileImage())
+                .level(member.getLevel())
+                .build();
     }
 }

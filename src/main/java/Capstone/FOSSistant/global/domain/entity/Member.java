@@ -27,6 +27,12 @@ public class Member extends BaseEntity {
     @Column(length = 50, nullable = false, unique = true)
     private String githubId;
 
+    @Column(length = 100, nullable = false)
+    private String nickname;
+
+    @Column(length = 512)
+    private String profileImage;
+
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 10)
@@ -34,6 +40,13 @@ public class Member extends BaseEntity {
 
     @OneToMany(mappedBy = "member", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<IssueFeedback> feedbackList = new ArrayList<>();
+
+
+    //로그인 정보 최신화
+    public void updateProfile(String nickname, String profileImage) {
+        this.nickname = nickname;
+        this.profileImage = profileImage;
+    }
 
     public void updateLevel(Level newLevel) {
         this.level = newLevel;

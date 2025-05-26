@@ -18,12 +18,14 @@ public enum SuccessStatus implements BaseCode {
     MEMBER_LOGOUT_OK(HttpStatus.OK, "MEMBER_100_004", "로그아웃이 완료되었습니다."),
     MEMBER_WITHDRAW_OK(HttpStatus.OK, "MEMBER_100_005", "회원 탈퇴가 완료되었습니다."),
     MEMBER_LEVEL_OK(HttpStatus.OK, "MEMBER_100_006", "회원의 레벨 설정이 완료되었습니다."),
+    MEMBER_PROFILE_OK(HttpStatus.OK,  "MEMBER_100_007", "회원 프로필 조회 성공"),
 
 
 
     // 이슈 관련
     ISSUE_TAGGING_OK(HttpStatus.OK, "ISSUE_200_001", "이슈 난이도 태깅 성공"),
-    ISSUE_GUIDE_OK(HttpStatus.OK, "ISSUE_200_002", "이슈 해결 가이드 제공 성공");
+    ISSUE_GUIDE_OK(HttpStatus.OK, "ISSUE_200_002", "이슈 해결 가이드 제공 성공"),
+    ISSUE_FEEDBACK_OK(HttpStatus.OK, "ISSUE_200_003", "이슈 피드백 저장/수정 성공");
 
     private final HttpStatus httpStatus;
     private final String code;

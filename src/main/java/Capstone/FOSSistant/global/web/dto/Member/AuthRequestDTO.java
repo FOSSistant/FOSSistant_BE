@@ -27,16 +27,7 @@ public class AuthRequestDTO {
         private String githubCode;
     }
 
-    @Getter
-    @Builder
-    @AllArgsConstructor(access = AccessLevel.PROTECTED)
-    @NoArgsConstructor(access = AccessLevel.PROTECTED)
-    public static class UpdateLevelRequest {
-        @Schema(description = "사용자의 level", example = "BEGINNER 또는 EXPERIENCED")
-        @NotNull
-        @EnumValue(enumClass = Level.class, message = "level에 유효한 값만 입력할 수 있습니다.")
-        private Level level;
-    }
+
 
     @Getter @Setter
     public static class DevTokenRequest {
