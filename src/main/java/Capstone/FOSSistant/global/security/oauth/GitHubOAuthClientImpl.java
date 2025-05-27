@@ -44,11 +44,13 @@ public class GitHubOAuthClientImpl implements GitHubOAuthClient {
         HttpEntity<MultiValueMap<String, String>> req = new HttpEntity<>(form, headers);
 
         try {
+            log.info("GitHub 로그인 시도: 받은 code = {}", code);
             ResponseEntity<JsonNode> resp = restTemplate.postForEntity(tokenUri, req, JsonNode.class);
             JsonNode body = resp.getBody();
             log.info("GitHub 토큰 응답: {}", body);
 
             String accessToken = body.path("access_token").asText(null);
+            log.info("파싱된 access_token: {}", accessToken);
             if (accessToken == null || accessToken.isBlank()) {
                 log.error("GitHub에서 access_token이 비어있습니다. 전체 응답: {}", body);
                 throw new AuthException(ErrorStatus.AUTH_GITHUB_FAIL);
@@ -72,6 +74,7 @@ public class GitHubOAuthClientImpl implements GitHubOAuthClient {
 
         try {
             // 1) 기본 프로필 조회
+            log.info("GitHub 사용자 정보 요청: accessToken = {}", accessToken);
             ResponseEntity<JsonNode> resp = restTemplate.exchange(
                     userInfoUri,
                     HttpMethod.GET,
@@ -79,7 +82,7 @@ public class GitHubOAuthClientImpl implements GitHubOAuthClient {
                     JsonNode.class
             );
             JsonNode userJson = resp.getBody();
-            log.info("GitHub 사용자 정보 응답: {}", userJson);
+            log.info("GitHub 사용자 정보 응답 status: {}, body: {}", resp.getStatusCode(), resp.getBody());
 
             // 2) 이메일 추출
             String email = userJson.path("email").asText("");
