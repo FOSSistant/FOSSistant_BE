@@ -83,78 +83,78 @@ public class GitHubHelperService {
             throw new GithubApiException(ErrorStatus.GITHUB_API_FAIL);
         }
     }
+    public record ContributeMeta(
+            String contributingLink,
+            List<String> issueTemplateLinks
+    ) {}
 
-    public GitHubData fetchAllData(String owner, String repo, String issueNumber) {
+    public ContributeMeta fetchContributionLinks(String owner, String repo) {
         long start = System.currentTimeMillis();
 
         String query = String.format("""
         query {
           repository(owner: "%s", name: "%s") {
-            issue(number: %s) {
-              title
-              body
-            }
-            defaultBranchRef {
-              name
-              target {
-                ... on Commit {
-                  tree {
-                    entries {
-                      path
-                    }
-                  }
-                }
+            contributing: object(expression: "HEAD:CONTRIBUTING.md") {
+              ... on Blob {
+                id  # 존재 확인용
               }
             }
-            readme: object(expression: "HEAD:README.md") {
-              ... on Blob {
-                text
+            issueTemplateDir: object(expression: "HEAD:.github/ISSUE_TEMPLATE") {
+              ... on Tree {
+                entries {
+                  name
+                  path
+                  type
+                }
               }
             }
           }
         }
-        """, owner, repo, issueNumber);
+    """, owner, repo);
 
         HttpHeaders headers = new HttpHeaders();
         headers.setBearerAuth(githubToken);
         headers.setContentType(MediaType.APPLICATION_JSON);
-        headers.set("Accept", "application/json");
+        headers.setAccept(List.of(MediaType.APPLICATION_JSON));
 
         HttpEntity<Map<String, String>> request = new HttpEntity<>(Map.of("query", query), headers);
 
         try {
             ResponseEntity<JsonNode> response = restTemplate.exchange(
-                    "https://api.github.com/graphql",
-                    HttpMethod.POST,
-                    request,
-                    JsonNode.class
+                    "https://api.github.com/graphql", HttpMethod.POST, request, JsonNode.class
             );
 
-            JsonNode repository = response.getBody().path("data").path("repository");
+            JsonNode repoNode = response.getBody().path("data").path("repository");
 
-            String title = repository.path("issue").path("title").asText("");
-            String body = repository.path("issue").path("body").asText("");
-            String readme = repository.path("readme").path("text").asText("");
+            // CONTRIBUTING.md 링크
+            boolean hasContributing = !repoNode.path("contributing").isMissingNode();
+            String contributingLink = hasContributing
+                    ? String.format("https://github.com/%s/%s/blob/HEAD/CONTRIBUTING.md", owner, repo)
+                    : null;
 
-            StringBuilder structure = new StringBuilder();
-            for (JsonNode node : repository
-                    .path("defaultBranchRef")
-                    .path("target")
-                    .path("tree")
-                    .path("entries")) {
-                structure.append(node.path("path").asText()).append("\n");
+            // ISSUE_TEMPLATE 링크 목록
+            List<String> issueTemplateLinks = new ArrayList<>();
+            JsonNode entries = repoNode.path("issueTemplateDir").path("entries");
+            if (entries.isArray()) {
+                for (JsonNode entry : entries) {
+                    if ("blob".equals(entry.path("type").asText())) {
+                        String path = entry.path("path").asText();
+                        String url = String.format("https://github.com/%s/%s/blob/HEAD/%s", owner, repo, path);
+                        issueTemplateLinks.add(url);
+                    }
+                }
             }
 
             long end = System.currentTimeMillis();
-            log.info("[GitHub GraphQL 전체 데이터 fetch 시간] {}ms", (end - start));
-
-            return new GitHubData(title, body, readme, structure.toString().trim());
+            log.info("[GitHub 기여 관련 링크 fetch 시간] {}ms", end - start);
+            return new ContributeMeta(contributingLink, issueTemplateLinks);
 
         } catch (RestClientException e) {
-            log.error("GitHub GraphQL API 호출 실패", e);
+            log.error("기여 관련 링크 조회 실패", e);
             throw new GithubApiException(ErrorStatus.GITHUB_API_FAIL);
         }
     }
+
     public record RepoMeta(String readme, String structure) {}
 
     public RepoMeta fetchRepoMetadata(String owner, String repo) {

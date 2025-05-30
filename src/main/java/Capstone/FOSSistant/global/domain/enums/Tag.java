@@ -4,5 +4,8 @@ public enum Tag {
     EASY,
     MEDIUM,
     HARD,
-    MISC
+    MISC;
+    public String toLowerCase() {
+        return this.name().toLowerCase();
+    }
 }

@@ -30,7 +30,7 @@ public class AIClassifierClient {
         long start = System.currentTimeMillis();
 
         Map<String, Object> payload = Map.of(
-                "model", "fossistant-v0.1.0",
+                "model", "fossistant-v0.2.0",
                 "issues", List.of(Map.of(
                         "title", title,
                         "body", shortBody
@@ -43,7 +43,7 @@ public class AIClassifierClient {
                 .bodyValue(payload)
                 .retrieve()
                 .bodyToMono(String.class)
-                .timeout(Duration.ofSeconds(10))
+                .timeout(Duration.ofSeconds(20))
                 .doOnSuccess(result -> {
                     long end = System.currentTimeMillis();
                     log.info("[AI API 호출 + 응답 수신 시간] {}ms", (end - start));

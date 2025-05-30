@@ -2,36 +2,45 @@ package Capstone.FOSSistant.global.service.llm;
 
 import org.springframework.stereotype.Component;
 
+import java.util.List;
+
 @Component
 public class PromptBuilder {
 
-    public String buildPrompt(String title, String body, String readme, String structure) {
+    public String buildPrompt(String title, String body, String readme, String structure, List<String> relatedLinks) {
         return String.format("""
-               다음은 GitHub 이슈와 레포지토리 정보입니다.
-                이 정보를 바탕으로 이슈를 해결하기 위한 가이드를 작성해주세요.
+            당신은 오픈소스 프로젝트의 이슈를 분석하고, 아래 6가지 항목에 대해 JSON 형태로 응답하는 AI 비서입니다. 응답은 반드시 한국어로 작성된 JSON 형식만 포함해야 합니다. 설명 텍스트를 추가하지 마세요.
 
-                -- 이슈 정보 --
-                [제목]: %s
-                [본문]: %s
+            -- 이슈 정보 --
+            [제목]: %s
+            [본문 (중요 문장은 꼭 1개 이상 추출해서 응답)]:
+            %s
 
-                -- 레포지토리 README --
-                %s
+            -- 레포지토리 README --
+            %s
 
-                -- 레포지토리 구조 (최상위 경로 기준) --
-                %s
+            -- 레포지토리 구조 (최상위 경로 기준) --
+            %s
 
-                💡 아래 형식을 따르는 JSON만 응답하세요. 다른 설명이나 텍스트는 절대 포함하지 마세요.
+            -- 기여 가이드 및 템플릿 링크 (있다면) --
+            %s
 
-                예시 응답 형식:
-                {
-                  "title": "이슈 제목",
-                  "difficulty": "easy | medium | hard | misc",
-                  "description": "이슈의 핵심을 정리한 설명",
-                  "solution": "이 이슈를 해결하기 위한 접근 방법",
-                  "caution": "주의할 점 또는 흔한 실수"
-                }
+            아래 JSON 형식에 맞춰 응답하세요. 절대 다른 텍스트는 포함하지 마세요. 마크다운문법으로 한국어로 작성하세요.
 
-                반드시 위 JSON 형식을 따르세요. 응답에 마크다운, 설명, 문장 등을 포함하지 마세요.
-               """, title, body, readme, structure);
+            {
+              "title": "이슈 제목",
+              "difficulty": "easy | medium | hard | misc",
+              "highlightedBody": "중요한 문장 1개 이상 추출하기",
+              "description": "이슈 설명",
+              "solution": "이슈 해결 방법(이스케이프 문자로 문단 나누기 필요, 마크다운으로 강조)",
+              "relatedLinks": "- [CONTRIBUTING.md](...)\n- [Issue Template](...)"
+            }
+            """,
+                title,
+                body,
+                readme,
+                structure,
+                String.join("\n- ", relatedLinks)
+        );
     }
 }
