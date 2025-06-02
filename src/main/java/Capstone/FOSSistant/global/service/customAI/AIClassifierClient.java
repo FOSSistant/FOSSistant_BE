@@ -37,6 +37,15 @@ public class AIClassifierClient {
                 ))
         );
 
+
+        try {
+            String jsonPayload = objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(payload);
+            log.info("전송 payload\n {}", jsonPayload);
+        }   catch(Exception e) {
+                log.warn("로깅 오류", e);
+        }
+
+
         return webClient.post()
                 .uri("https://api.ucyang.com/v1/fossistant/difficulty/")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -66,17 +75,57 @@ public class AIClassifierClient {
                 });
     }
 
-    // 결과 파싱 헬퍼 (선택적)
-    public String extractDifficultyFromResult(String resultJson) {
+    // Batch 분류 요청
+    public Mono<String> classifyBatch(List<String[]> titleBodyList) {
+        List<Map<String, String>> issues = titleBodyList.stream()
+                .map(pair -> Map.of(
+                        "title", pair[0],
+                        "body", (pair[1] == null || pair[1].isBlank())
+                                ? "(no description provided)"
+                                : pair[1].replaceAll("(?s)```.*?```", "")
+                ))
+                .toList();
+
+        Map<String, Object> payload = Map.of(
+                "model", "fossistant-v0.2.0",
+                "issues", issues
+        );
+
         try {
-            JsonNode root = objectMapper.readTree(resultJson);
-            JsonNode results = root.get("results");
-            if (results != null && results.isArray() && results.size() > 0) {
-                return results.get(0).get("difficulty").asText().toLowerCase();
-            }
+            String jsonPayload = objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(payload);
+            log.info("전송 batch payload\n {}", jsonPayload);
         } catch (Exception e) {
-            log.error("AI 응답 파싱 실패 - result: {}", resultJson, e);
+            log.warn("batch 로깅 오류", e);
         }
-        return "misc";
+
+        long start = System.currentTimeMillis();
+
+        return webClient.post()
+                .uri("https://api.ucyang.com/v1/fossistant/difficulty/")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(payload)
+                .retrieve()
+                .bodyToMono(String.class)
+                .timeout(Duration.ofSeconds(30))
+                .doOnSuccess(result -> {
+                    long end = System.currentTimeMillis();
+                    log.info("[AI Batch API 호출 + 응답 수신 시간] {}ms", (end - start));
+                })
+                .doOnError(e -> {
+                    long end = System.currentTimeMillis();
+                    log.warn("[AI Batch API 호출 실패 시간] {}ms", (end - start));
+                })
+                .onErrorResume(TimeoutException.class, e -> {
+                    log.warn("AI Batch Timeout 발생", e);
+                    return Mono.just("{\"results\": []}");
+                })
+                .onErrorResume(WebClientResponseException.class, e -> {
+                    log.error("AI Batch 응답 에러: {}", e.getMessage(), e);
+                    return Mono.just("{\"results\": []}");
+                })
+                .onErrorResume(Exception.class, e -> {
+                    log.error("AI Batch 기타 예외 발생", e);
+                    return Mono.just("{\"results\": []}");
+                });
     }
 }

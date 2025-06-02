@@ -27,7 +27,7 @@ import java.util.concurrent.CompletableFuture;
 @Service
 @RequiredArgsConstructor
 @Transactional
-public class IssueListServiceImpl implements IssueListService {
+public class IssueListServiceImpl implements IssueListService  {
 
     private final IssueListRepository issueListRepository;
     private final StringRedisTemplate redisTemplate;
@@ -35,26 +35,18 @@ public class IssueListServiceImpl implements IssueListService {
     private final IssueListConverter issueListConverter;
     private final AIClassifierClient aiClassifierClient;
 
-    //여러 이슈 분류 요청 (batch + sleep으로 AI 서버 부하 제어)
+    //여러 이슈 분류 요청 (batch + sleep으로 AI 서버 부하 제어, batch 기반 AI 요청)
     @Override
     @MeasureExecutionTime
     public List<CompletableFuture<IssueListResponseDTO.IssueResponseDTO>> classifyAll(List<IssueListRequestDTO.IssueRequestDTO> dtoList) {
         long start = System.currentTimeMillis();
-
         int batchSize = 5;
         List<CompletableFuture<IssueListResponseDTO.IssueResponseDTO>> allFutures = new ArrayList<>();
 
         for (int i = 0; i < dtoList.size(); i += batchSize) {
             int end = Math.min(i + batchSize, dtoList.size());
             List<IssueListRequestDTO.IssueRequestDTO> batch = dtoList.subList(i, end);
-
-            List<CompletableFuture<IssueListResponseDTO.IssueResponseDTO>> batchFutures =
-                    batch.stream()
-                            .map(this::classify)
-                            .toList();
-
-            allFutures.addAll(batchFutures);
-
+            allFutures.addAll(classifyBatch(batch));
             try {
                 Thread.sleep(10); // AI 서버 부하 줄이기
             } catch (InterruptedException e) {
@@ -64,8 +56,76 @@ public class IssueListServiceImpl implements IssueListService {
 
         long end = System.currentTimeMillis();
         log.info("[총 classifyAll 소요 시간] {}ms", (end - start));
-
         return allFutures;
+    }
+
+    // Helper: batch 단위로 분류 (캐시 우선, 미캐시건만 batch로 AI 요청)
+    private List<CompletableFuture<IssueListResponseDTO.IssueResponseDTO>> classifyBatch(List<IssueListRequestDTO.IssueRequestDTO> batch) {
+        List<CompletableFuture<IssueListResponseDTO.IssueResponseDTO>> futures = new ArrayList<>();
+
+        List<IssueListRequestDTO.IssueRequestDTO> toClassify = new ArrayList<>();
+        List<Integer> indexesToClassify = new ArrayList<>();
+        // 캐시된 태그는 즉시 future 반환
+        for (int i = 0; i < batch.size(); i++) {
+            var dto = batch.get(i);
+            String key = "issue:" + dto.getIssueId();
+            String cached = redisTemplate.opsForValue().get(key);
+            if (cached != null) {
+                Tag tag = Tag.valueOf(cached.toUpperCase());
+                futures.add(CompletableFuture.completedFuture(issueListConverter.toResponseDTO(dto.getIssueId(), tag)));
+            } else {
+                toClassify.add(dto);
+                indexesToClassify.add(i);
+            }
+        }
+        // 미캐시건만 batch로 AI 분류 요청
+        if (!toClassify.isEmpty()) {
+            List<String[]> titleBodyList = toClassify.stream()
+                    .map(dto -> extractTitleAndBody(dto.getIssueId()))
+                    .toList();
+            CompletableFuture<List<Tag>> classified = classifyWithAIBatch(titleBodyList);
+            for (int i = 0; i < toClassify.size(); i++) {
+                int finalI = i;
+                futures.add(classified.thenApply(tags -> {
+                    Tag tag = tags.get(finalI);
+                    var dto = toClassify.get(finalI);
+                    cacheDifficulty("issue:" + dto.getIssueId(), tag);
+                    persistDifficulty(dto, tag);
+                    return issueListConverter.toResponseDTO(dto.getIssueId(), tag);
+                }));
+            }
+        }
+        return futures;
+    }
+
+    // Helper: batch로 AI에 여러 title/body를 한번에 요청
+    private CompletableFuture<List<Tag>> classifyWithAIBatch(List<String[]> titleBodyList) {
+        return aiClassifierClient.classifyBatch(titleBodyList)
+                .map(result -> {
+                    try {
+                        ObjectMapper objectMapper = new ObjectMapper();
+                        var root = objectMapper.readTree(result);
+                        var results = root.get("results");
+                        List<Tag> tags = new ArrayList<>();
+                        if (results != null && results.isArray()) {
+                            for (var node : results) {
+                                String diff = node.get("difficulty").asText("misc").toLowerCase();
+                                tags.add(switch (diff) {
+                                    case "easy" -> Tag.EASY;
+                                    case "medium" -> Tag.MEDIUM;
+                                    case "hard" -> Tag.HARD;
+                                    default -> Tag.MISC;
+                                });
+                            }
+                        }
+                        return tags;
+                    } catch (Exception e) {
+                        log.error("AI 일괄 응답 파싱 실패 - result: {}", result, e);
+                        // 실패 시 모두 MISC
+                        return titleBodyList.stream().map(v -> Tag.MISC).toList();
+                    }
+                })
+                .toFuture();
     }
 
 
@@ -175,5 +235,7 @@ public class IssueListServiceImpl implements IssueListService {
                 })
                 .toFuture();
     }
+
+
 
 }
