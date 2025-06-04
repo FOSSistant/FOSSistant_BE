@@ -41,6 +41,9 @@ public class Member extends BaseEntity {
     @OneToMany(mappedBy = "member", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<IssueFeedback> feedbackList = new ArrayList<>();
 
+    @OneToMany(mappedBy = "member", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<MemberTopLanguage> topLanguages = new ArrayList<>();
+
 
     //로그인 정보 최신화
     public void updateProfile(String nickname, String profileImage) {

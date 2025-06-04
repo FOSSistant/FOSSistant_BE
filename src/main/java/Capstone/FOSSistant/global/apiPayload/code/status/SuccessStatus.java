@@ -20,6 +20,9 @@ public enum SuccessStatus implements BaseCode {
     MEMBER_LEVEL_OK(HttpStatus.OK, "MEMBER_100_006", "회원의 레벨 설정이 완료되었습니다."),
     MEMBER_PROFILE_OK(HttpStatus.OK,  "MEMBER_100_007", "회원 프로필 조회 성공"),
 
+    //레포 관련
+    REPO_CRAWLING_OK(HttpStatus.OK, "REPO_300_001", "트렌딩 레포지터리 크롤링이 완료되었습니다."),
+
 
 
     // 이슈 관련

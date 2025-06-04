@@ -41,6 +41,7 @@ public class SecurityConfig {
                                 .requestMatchers("/actuator/**").permitAll()
                                 .requestMatchers("/auth/**").permitAll()
                                 .requestMatchers("/members/**").permitAll()
+                                .requestMatchers("/repo/**").permitAll()
                                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                                 .requestMatchers("/", "/api-docs/**", "/api-docs/swagger-config/*", "/swagger-ui/*", "/swagger-ui/**", "/v3/api-docs/**", "/image/upload", "/image/delete").permitAll()
                                 .anyRequest().authenticated()
