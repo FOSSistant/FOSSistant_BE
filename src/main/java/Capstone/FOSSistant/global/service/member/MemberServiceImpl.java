@@ -10,6 +10,7 @@ import Capstone.FOSSistant.global.domain.enums.Level;
 import Capstone.FOSSistant.global.repository.MemberRepository;
 import Capstone.FOSSistant.global.security.oauth.GitHubOAuthClient;
 import Capstone.FOSSistant.global.security.provider.JwtTokenProvider;
+import Capstone.FOSSistant.global.service.GitHubHelperService;
 import Capstone.FOSSistant.global.web.dto.Member.AuthResponseDTO;
 import Capstone.FOSSistant.global.web.dto.Member.MemberResponseDTO;
 import lombok.RequiredArgsConstructor;
@@ -18,6 +19,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
+import java.util.List;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -27,6 +30,7 @@ public class MemberServiceImpl implements MemberService {
     private final JwtTokenProvider jwtTokenProvider;
     private final GitHubOAuthClient gitHubOAuthClient;
     private final StringRedisTemplate redisTemplate;
+    private final GitHubHelperService gitHubHelperService;
 
     @Override
     @Transactional(readOnly = true)
@@ -67,6 +71,8 @@ public class MemberServiceImpl implements MemberService {
                             .level(Level.BEGINNER)
                             .build());
                 });
+
+        updateTopLanguages(member, accessToken);
 
         // 4. JWT 발급 & Redis에 리프레시 토큰 저장
         String accessJwt  = jwtTokenProvider.createAccessToken(member.getMemberId());
@@ -164,4 +170,19 @@ public class MemberServiceImpl implements MemberService {
                 .level(member.getLevel())
                 .build();
     }
+
+    public void updateTopLanguages(Member member, String accessToken) {
+        Map<String, Long> langStats = gitHubHelperService.getUserLanguageStats(accessToken);
+
+        List<String> top3 = langStats.entrySet().stream()
+                .sorted(Map.Entry.<String, Long>comparingByValue().reversed())
+                .limit(3)
+                .map(Map.Entry::getKey)
+                .toList();
+
+        member.updateTopLanguages(top3);
+        memberRepository.save(member);
+
+    }
+
 }

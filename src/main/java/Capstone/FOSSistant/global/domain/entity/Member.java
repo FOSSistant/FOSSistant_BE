@@ -51,6 +51,17 @@ public class Member extends BaseEntity {
         this.profileImage = profileImage;
     }
 
+    public void updateTopLanguages(List<String> newLanguages) {
+        this.topLanguages.clear();
+        for (String lang : newLanguages) {
+            this.topLanguages.add(MemberTopLanguage.builder()
+                    .member(this)
+                    .language(lang)
+                    .build());
+        }
+    }
+
+
     public void updateLevel(Level newLevel) {
         this.level = newLevel;
     }
