@@ -1,5 +1,7 @@
 package Capstone.FOSSistant.global.service.githubRepo;
 
+import Capstone.FOSSistant.global.apiPayload.code.status.ErrorStatus;
+import Capstone.FOSSistant.global.apiPayload.exception.GeneralException;
 import Capstone.FOSSistant.global.domain.entity.GitHubRepository;
 import Capstone.FOSSistant.global.domain.entity.Member;
 import Capstone.FOSSistant.global.domain.entity.MemberTopLanguage;
@@ -11,6 +13,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 
@@ -65,4 +68,32 @@ public class GithubRepositoryServiceImpl implements GithubRepositoryService {
                 .stars(repo.getStars())
                 .build();
     }
+
+    @Override
+    public GithubRepoDTO.GithubRepoListDTO recommendByLanguage(String language) {
+        List<GitHubRepository> repoList = gitHubRepositoryRepository.findTop15ByLanguage(language);
+
+        if (repoList.isEmpty()) {
+            throw new GeneralException(ErrorStatus.GITHUB_NO_REPOSITORY_FOUND);
+        }
+
+        Collections.shuffle(repoList);
+        List<GitHubRepository> random3 = repoList.stream().limit(3).toList();
+
+        List<GithubRepoDTO.GithubRepoResponseDTO> result = random3.stream()
+                .map(repo -> GithubRepoDTO.GithubRepoResponseDTO.builder()
+                        .name(repo.getName())
+                        .fullName(repo.getFullName())
+                        .url(repo.getUrl())
+                        .description(repo.getDescription())
+                        .language(repo.getLanguage())
+                        .stars(repo.getStars())
+                        .build())
+                .toList();
+
+        return GithubRepoDTO.GithubRepoListDTO.builder()
+                .results(result)
+                .build();
+    }
+
 }

@@ -1,5 +1,6 @@
 package Capstone.FOSSistant.global.web.dto.GithubRepo;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.*;
 
 import java.util.List;
@@ -28,5 +29,4 @@ public class GithubRepoDTO {
     public static class GithubRepoListDTO {
         private List<GithubRepoResponseDTO> results;
     }
-
 }

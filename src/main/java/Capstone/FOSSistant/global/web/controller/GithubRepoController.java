@@ -11,6 +11,7 @@ import Capstone.FOSSistant.global.web.dto.GithubRepo.GithubRepoDTO;
 import Capstone.FOSSistant.global.web.dto.util.custom.ApiErrorCodeExamples;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -26,14 +27,14 @@ public class GithubRepoController {
 
     private final GithubRepositoryServiceImpl githubRepositoryService;
 
-    @PostMapping("/trending")
-    @Operation(summary = "트렌딩 레포지터리 저장", description = "언어별 트렌딩 레포지터리 15개씩 가져와 DB에 저장")
-    @ApiErrorCodeExamples({ErrorStatus.GITHUB_API_FAIL, ErrorStatus._INTERNAL_SERVER_ERROR})
-    public APiResponse<Void> storeTrendingRepositories() {
-        log.info("트렌딩 레포지터리 저장 요청 수신");
-        githubRepositoryService.fetchAndStoreTrendingRepositories();
-        return APiResponse.onSuccess(SuccessStatus.REPO_CRAWLING_OK, null);
-    }
+//    @PostMapping("/trending")
+//    @Operation(summary = "트렌딩 레포지터리 저장", description = "언어별 트렌딩 레포지터리 15개씩 가져와 DB에 저장")
+//    @ApiErrorCodeExamples({ErrorStatus.GITHUB_API_FAIL, ErrorStatus._INTERNAL_SERVER_ERROR})
+//    public APiResponse<Void> storeTrendingRepositories() {
+//        log.info("트렌딩 레포지터리 저장 요청 수신");
+//        githubRepositoryService.fetchAndStoreTrendingRepositories();
+//        return APiResponse.onSuccess(SuccessStatus.REPO_CRAWLING_OK, null);
+//    }
 
     @GetMapping("/personal")
     @Operation(
@@ -45,6 +46,22 @@ public class GithubRepoController {
                 githubRepositoryService.recommendTopRepositories(member));
     }
 
-
+    @GetMapping("/category/{language}")
+    @Operation(
+            summary = "언어별 레포지터리 추천",
+            description = "지정한 언어(Java, TypeScript, JavaScript, Python, Jupyter Notebook)에 해당하는 무작위 레포지터리 3개를 반환합니다."
+    )
+    public APiResponse<GithubRepoDTO.GithubRepoListDTO> recommendByLanguage(
+            @Parameter(
+                    description = "프론트에서 선택한 언어. 다음 중 하나여야 합니다: Java, TypeScript, JavaScript, Python, Jupyter Notebook",
+                    schema = @Schema(allowableValues = {
+                            "Java", "TypeScript", "JavaScript", "Python", "Jupyter Notebook"
+                    })
+            )
+            @PathVariable String language
+    ) {
+        return APiResponse.onSuccess(SuccessStatus.REPO_RECOMMEND_OK,
+                githubRepositoryService.recommendByLanguage(language));
+    }
 
 }

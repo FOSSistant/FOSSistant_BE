@@ -33,6 +33,7 @@ public enum ErrorStatus implements BaseErrorCode {
     NOT_CONTAIN_TOKEN(HttpStatus.INTERNAL_SERVER_ERROR, "INFRA_500_003", "Redis에 토큰이 없음."),
     AI_API_FAIL(HttpStatus.BAD_GATEWAY, "EXT_502_001", "AI API 호출 실패"),
     GITHUB_API_FAIL(HttpStatus.BAD_GATEWAY, "EXT_502_002", "Github API 호출 실패"),
+    GITHUB_NO_REPOSITORY_FOUND(HttpStatus.BAD_GATEWAY, "EXT_502_002", "DB에 저장된 레포지터리 없음"),
 
     // 가장 일반적인 응답
     _INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "COMMON500", "서버 에러, 관리자에게 문의 바랍니다."),

@@ -7,5 +7,6 @@ import java.util.List;
 
 public interface GithubRepositoryRepository extends JpaRepository<GitHubRepository, Long> {
     List<GitHubRepository> findAllByLanguage(String language);
+    List<GitHubRepository> findTop15ByLanguage(String language);
 
 }

@@ -7,6 +7,7 @@ public interface GithubRepositoryService {
     void fetchAndStoreTrendingRepositories();
 
     GithubRepoDTO.GithubRepoListDTO recommendTopRepositories(Member member);
-}
+    GithubRepoDTO.GithubRepoListDTO recommendByLanguage(String language);
+    }
 
 
