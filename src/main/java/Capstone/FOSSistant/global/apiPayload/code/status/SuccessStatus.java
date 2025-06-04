@@ -22,6 +22,7 @@ public enum SuccessStatus implements BaseCode {
 
     //레포 관련
     REPO_CRAWLING_OK(HttpStatus.OK, "REPO_300_001", "트렌딩 레포지터리 크롤링이 완료되었습니다."),
+    REPO_RECOMMEND_OK(HttpStatus.OK, "REPO_300_002", "개인 맞춤형 트렌딩 레포지터리 추천이 완료되었습니다."),
 
 
 

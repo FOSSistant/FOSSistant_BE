@@ -3,9 +3,14 @@ package Capstone.FOSSistant.global.web.controller;
 import Capstone.FOSSistant.global.apiPayload.APiResponse;
 import Capstone.FOSSistant.global.apiPayload.code.status.ErrorStatus;
 import Capstone.FOSSistant.global.apiPayload.code.status.SuccessStatus;
+import Capstone.FOSSistant.global.domain.entity.Member;
+import Capstone.FOSSistant.global.security.handler.annotation.AuthUser;
+import Capstone.FOSSistant.global.service.githubRepo.GithubRepositoryService;
 import Capstone.FOSSistant.global.service.githubRepo.GithubRepositoryServiceImpl;
+import Capstone.FOSSistant.global.web.dto.GithubRepo.GithubRepoDTO;
 import Capstone.FOSSistant.global.web.dto.util.custom.ApiErrorCodeExamples;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -29,4 +34,17 @@ public class GithubRepoController {
         githubRepositoryService.fetchAndStoreTrendingRepositories();
         return APiResponse.onSuccess(SuccessStatus.REPO_CRAWLING_OK, null);
     }
+
+    @GetMapping("/personal")
+    @Operation(
+            summary = "사용자 Top 3 언어 기반 레포 추천",
+            description = "로그인한 사용자의 Top 3 언어별로 GitHub 트렌딩 레포지터리 중 무작위로 1개씩 추천 (총 3개)"
+    )
+    public APiResponse<GithubRepoDTO.GithubRepoListDTO> recommendUserTopLangRepos(@AuthUser @Parameter(hidden = true) Member member) {
+        return APiResponse.onSuccess(SuccessStatus.REPO_RECOMMEND_OK,
+                githubRepositoryService.recommendTopRepositories(member));
+    }
+
+
+
 }
