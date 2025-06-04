@@ -30,7 +30,7 @@ public class PromptBuilder {
             {
               "title": "이슈 제목",
               "difficulty": "easy | medium | hard | misc",
-              "highlightedBody": "중요한 문장 1개 이상 추출하기",
+              "highlightedBody": "중요한 문장 1개 이상 추출하기"(무조건 그대로 작성하세요, 다른 텍스트 포함하지 마세요, 영어본문이면 영어로 그대로 원문을 넣으세요),
               "description": "이슈 설명",
               "solution": "이슈 해결 방법(이스케이프 문자로 문단 나누기 필요, 마크다운으로 강조)",
               "relatedLinks": "- [CONTRIBUTING.md](...)\n- [Issue Template](...)"
