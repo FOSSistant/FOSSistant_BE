@@ -64,17 +64,15 @@ jobs:
 
       - name: Generate .env for Docker Compose
         run: |
-          cat <<EOF > .env
-AZURE_DB_USERNAME=${{ secrets.AZURE_DB_USERNAME }}
-AZURE_DB_PASSWORD=${{ secrets.AZURE_DB_PASSWORD }}
-GEMINI_KEY=${{ secrets.GEMINI_KEY }}
-GITHUB_TOKEN=${{ secrets.HUB_TOKEN }}
-JWT_SECRET_KEY=${{ secrets.JWT_SECRET_KEY }}
-JWT_ACCESS_TOKEN_TIME=${{ secrets.JWT_ACCESS_TOKEN_TIME }}
-JWT_REFRESH_TOKEN_TIME=${{ secrets.JWT_REFRESH_TOKEN_TIME }}
-GITHUB_CLIENT_ID=${{ secrets.CLIENT_ID }}
-GITHUB_CLIENT_SECRET=${{ secrets.CLIENT_SECRET }}
-EOF
+          echo "AZURE_DB_USERNAME=${{ secrets.AZURE_DB_USERNAME }}" >> .env
+          echo "AZURE_DB_PASSWORD=${{ secrets.AZURE_DB_PASSWORD }}" >> .env
+          echo "GEMINI_KEY=${{ secrets.GEMINI_KEY }}" >> .env
+          echo "GITHUB_TOKEN=${{ secrets.HUB_TOKEN }}" >> .env
+          echo "JWT_SECRET_KEY=${{ secrets.JWT_SECRET_KEY }}" >> .env
+          echo "JWT_ACCESS_TOKEN_TIME=${{ secrets.JWT_ACCESS_TOKEN_TIME }}" >> .env
+          echo "JWT_REFRESH_TOKEN_TIME=${{ secrets.JWT_REFRESH_TOKEN_TIME }}" >> .env
+          echo "GITHUB_CLIENT_ID=${{ secrets.CLIENT_ID }}" >> .env
+          echo "GITHUB_CLIENT_SECRET=${{ secrets.CLIENT_SECRET }}" >> .env
 
       - name: Upload docker-compose.yml to Azure VM
         run: |
@@ -97,27 +95,26 @@ EOF
           port: 22
           script: |
             set -eux
-
             cd /home/ubuntu/fossistant
 
-            echo "🛑 Stopping host's Redis service if running..."
+            echo "🛑 Stopping Redis if running..."
             sudo systemctl stop redis-server || true
 
-            echo "🧼 Killing any process listening on port 6379..."
+            echo "🧼 Killing anything on port 6379..."
             sudo fuser -k 6379/tcp || true
 
-            echo "🧼 Forcibly removing any existing containers named 'redis' or 'fossistant'..."
+            echo "🧼 Removing old containers..."
             docker rm -f redis fossistant || true
 
-            echo "🧹 Stopping old containers and removing orphans..."
+            echo "🧹 Stopping and cleaning old compose stack..."
             sudo docker compose down --remove-orphans || true
             sudo docker compose rm -f || true
 
-            echo "✅ Pulling latest images from Docker Hub..."
+            echo "✅ Pulling new image..."
             sudo docker compose pull
 
-            echo "🚀 Starting new containers with Docker Compose..."
+            echo "🚀 Deploying with Compose..."
             sudo docker compose up -d --build
 
-            echo "🎉 Deployment complete! Current containers:"
+            echo "🎉 Deployment complete!"
             docker ps
