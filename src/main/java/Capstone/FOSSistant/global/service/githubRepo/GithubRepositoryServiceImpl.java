@@ -1,5 +1,6 @@
 package Capstone.FOSSistant.global.service.githubRepo;
 
+import Capstone.FOSSistant.global.aop.annotation.MeasureExecutionTime;
 import Capstone.FOSSistant.global.apiPayload.code.status.ErrorStatus;
 import Capstone.FOSSistant.global.apiPayload.exception.GeneralException;
 import Capstone.FOSSistant.global.domain.entity.GitHubRepository;
@@ -38,6 +39,7 @@ public class GithubRepositoryServiceImpl implements GithubRepositoryService {
 
     @Override
     @Transactional(readOnly = true)
+    @MeasureExecutionTime
     public GithubRepoDTO.GithubRepoListDTO recommendTopRepositories(Member member) {
 
         List<MemberTopLanguage> topLanguages = member.getTopLanguages();
@@ -70,6 +72,7 @@ public class GithubRepositoryServiceImpl implements GithubRepositoryService {
     }
 
     @Override
+    @MeasureExecutionTime
     public GithubRepoDTO.GithubRepoListDTO recommendByLanguage(String language) {
         List<GitHubRepository> repoList = gitHubRepositoryRepository.findTop15ByLanguage(language);
 

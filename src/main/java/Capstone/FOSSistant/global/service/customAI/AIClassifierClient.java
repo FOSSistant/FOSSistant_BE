@@ -24,7 +24,7 @@ public class AIClassifierClient {
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public Mono<String> classify(String title, String body) {
-        String shortBody = (body == null || body.isBlank()) ? "(no description provided)" : body;
+        String shortBody = (body == null || body.isBlank()) ? "" : body;
         shortBody = shortBody.replaceAll("(?s)```.*?```", "");
 
         long start = System.currentTimeMillis();
@@ -81,7 +81,7 @@ public class AIClassifierClient {
                 .map(pair -> Map.of(
                         "title", pair[0],
                         "body", (pair[1] == null || pair[1].isBlank())
-                                ? "(no description provided)"
+                                ? ""
                                 : pair[1].replaceAll("(?s)```.*?```", "")
                 ))
                 .toList();
@@ -107,7 +107,7 @@ public class AIClassifierClient {
                 .retrieve()
                 .bodyToMono(String.class)
                 .timeout(Duration.ofSeconds(30))
-                .doOnSuccess(result -> {
+                .doOnSuccess( result -> {
                     long end = System.currentTimeMillis();
                     log.info("[AI Batch API 호출 + 응답 수신 시간] {}ms", (end - start));
                 })
@@ -127,5 +127,18 @@ public class AIClassifierClient {
                     log.error("AI Batch 기타 예외 발생", e);
                     return Mono.just("{\"results\": []}");
                 });
+    }
+    /**
+     * 단건 기본값: difficulty="misc" 하나를 리턴
+     */
+    public Mono<String> defaultSingleResult() {
+        return Mono.just("{\"results\":[{\"difficulty\":\"misc\",\"score\":0.0}]}");
+    }
+
+    /**
+     * 배치 기본값: 빈 리스트
+     */
+    public Mono<String> defaultBatchResult() {
+        return Mono.just("{\"results\":[]}");
     }
 }
