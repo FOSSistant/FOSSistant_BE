@@ -1,0 +1,39 @@
+version: '3.8'
+
+services:
+  redis:
+    image: redis:7
+    container_name: redis
+    ports:
+      - "6379:6379"
+    command: ["redis-server", "--maxmemory", "256mb", "--maxmemory-policy", "allkeys-lru"]
+    restart: always
+    networks:
+      - foss-net
+
+  app:
+    image: sokft/fossistant:latest
+    container_name: fossistant
+    ports:
+      - "8080:8080"
+    depends_on:
+      - redis
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://fossistantdb.mysql.database.azure.com:3306/fossistantdb?sslMode=REQUIRED
+      SPRING_DATASOURCE_USERNAME: ${AZURE_DB_USERNAME}
+      SPRING_DATASOURCE_PASSWORD: ${AZURE_DB_PASSWORD}
+      SPRING_REDIS_HOST: redis
+      SPRING_REDIS_PORT: 6379
+      SPRING_GEMINI_API_KEY: ${GEMINI_KEY}
+      SPRING_GITHUB_TOKEN: ${GITHUB_TOKEN}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      JWT_ACCESS_TOKEN_TIME: ${JWT_ACCESS_TOKEN_TIME}
+      JWT_REFRESH_TOKEN_TIME: ${JWT_REFRESH_TOKEN_TIME}
+      SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID}
+      SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET}
+    command: java -Xmx512m -Xms256m -jar /app.jar
+    networks:
+      - foss-net
+
+networks:
+  foss-net:
