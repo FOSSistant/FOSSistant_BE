@@ -1,106 +1,51 @@
-name: CI/CD with Gradle, Docker Image & Docker Compose
+name: Deploy with Docker Compose
 
 on:
   push:
     branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
-
-permissions:
-  contents: read
-
-env:
-  # Docker Compose가 root 권한 필요할 수도 있어서 sudo 붙입니다.
-  DOCKER_COMPOSE_CMD: "sudo docker compose"
 
 jobs:
-  build-and-push-image:
-    name: Build & Push Docker Image
+  deploy:
     runs-on: ubuntu-latest
+
     steps:
-      # 1) Repository Checkout
+      # 1. 레포지토리 체크아웃
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      # 2) JDK 17 설치
-      - name: Set up JDK 17
-        uses: actions/setup-java@v3
-        with:
-          java-version: '17'
-          distribution: 'temurin'
-
-      # 3) Gradle 권한 부여
-      - name: Grant execute permission for Gradle
-        run: chmod +x ./gradlew
-
-      # 4) Gradle 빌드 (bootJar 생성)
-      - name: Build with Gradle
-        run: ./gradlew clean bootJar
-
-      # 5) Docker 이미지 빌드
-      - name: Build Docker Image
-        run: docker build -t ${{ secrets.DOCKER_USERNAME }}/fossistant:latest .
-
-      # 6) Docker Hub 로그인
-      - name: Docker Hub Login
-        uses: docker/login-action@v2
-        with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
-
-      # 7) Docker 이미지 Push
-      - name: Push Docker Image to Docker Hub
-        run: docker push ${{ secrets.DOCKER_USERNAME }}/fossistant:latest
-
-  deploy-with-compose:
-    name: Deploy to Azure VM via Docker Compose
-    runs-on: ubuntu-latest
-    needs: build-and-push-image
-
-    steps:
-      # 1) SSH 키 세팅
-      - name: Setup SSH private key
+      # 2. SSH 키 설정
+      - name: Set up SSH private key
         run: |
           echo "${{ secrets.SSH_KEY }}" > private_key.pem
           chmod 600 private_key.pem
 
-      # 2) SSH 접속 테스트 (디버그)
-      - name: Debug SSH connection
-        run: |
-          ssh -o StrictHostKeyChecking=no -i private_key.pem \
-            ${{ secrets.AZURE_VM_USER }}@${{ secrets.AZURE_VM_HOST }} "echo ✅ SSH 접속 성공!"
-
-      # 3) .env 파일 생성 (GitHub Secrets → .env)
+      # 3. .env 파일 생성
       - name: Generate .env for Docker Compose
         run: |
-          cat <<EOF > .env
-          AZURE_DB_USERNAME=${{ secrets.AZURE_DB_USERNAME }}
-          AZURE_DB_PASSWORD=${{ secrets.AZURE_DB_PASSWORD }}
-          GEMINI_KEY=${{ secrets.GEMINI_KEY }}
-          GITHUB_TOKEN=${{ secrets.HUB_TOKEN }}
-          JWT_SECRET_KEY=${{ secrets.JWT_SECRET_KEY }}
-          JWT_ACCESS_TOKEN_TIME=${{ secrets.JWT_ACCESS_TOKEN_TIME }}
-          JWT_REFRESH_TOKEN_TIME=${{ secrets.JWT_REFRESH_TOKEN_TIME }}
-          GITHUB_CLIENT_ID=${{ secrets.GITHUB_CLIENT_ID }}
-          GITHUB_CLIENT_SECRET=${{ secrets.GITHUB_CLIENT_SECRET }}
-          EOF
+          echo "AZURE_DB_USERNAME=${{ secrets.AZURE_DB_USERNAME }}" >> .env
+          echo "AZURE_DB_PASSWORD=${{ secrets.AZURE_DB_PASSWORD }}" >> .env
+          echo "GEMINI_KEY=${{ secrets.GEMINI_KEY }}" >> .env
+          echo "GITHUB_TOKEN=${{ secrets.HUB_TOKEN }}" >> .env
+          echo "JWT_SECRET_KEY=${{ secrets.JWT_SECRET_KEY }}" >> .env
+          echo "JWT_ACCESS_TOKEN_TIME=${{ secrets.JWT_ACCESS_TOKEN_TIME }}" >> .env
+          echo "JWT_REFRESH_TOKEN_TIME=${{ secrets.JWT_REFRESH_TOKEN_TIME }}" >> .env
+          echo "GITHUB_CLIENT_ID=${{ secrets.CLIENT_ID }}" >> .env
+          echo "GITHUB_CLIENT_SECRET=${{ secrets.CLIENT_SECRET }}" >> .env
 
-      # 4) docker-compose.yml 업로드
+      # 4. docker-compose.yml 업로드
       - name: Upload docker-compose.yml to Azure VM
         run: |
-          scp -i private_key.pem -o StrictHostKeyChecking=no \
-            docker-compose.yml \
+          scp -i private_key.pem -o StrictHostKeyChecking=no docker-compose.yml \
             ${{ secrets.AZURE_VM_USER }}@${{ secrets.AZURE_VM_HOST }}:/home/ubuntu/fossistant/docker-compose.yml
 
-      # 5) .env 업로드
+      # 5. .env 업로드
       - name: Upload .env to Azure VM
         run: |
-          scp -i private_key.pem -o StrictHostKeyChecking=no \
-            .env \
+          scp -i private_key.pem -o StrictHostKeyChecking=no .env \
             ${{ secrets.AZURE_VM_USER }}@${{ secrets.AZURE_VM_HOST }}:/home/ubuntu/fossistant/.env
 
-      # 6) SSH로 접속하여 배포 (포트 충돌 및 컨테이너 정리 포함)
-      - name: SSH to Azure VM and Deploy with Compose
+      # 6. SSH로 접속하여 배포
+      - name: SSH to Azure VM and Deploy
         uses: appleboy/ssh-action@v0.1.3
         with:
           host: ${{ secrets.AZURE_VM_HOST }}
@@ -108,25 +53,23 @@ jobs:
           key: ${{ secrets.SSH_KEY }}
           port: 22
           script: |
-            set -eux
-
             cd /home/ubuntu/fossistant
 
             echo "🧼 Killing any process listening on port 6379..."
+            # (선택 사항) Redis가 사용 중인 포트를 잡고 있는 프로세스 강제 종료
             sudo fuser -k 6379/tcp || true
 
-            echo "🧼 Forcibly removing any existing containers named 'redis' or 'fossistant'..."
+            echo "🧼 Forcibly removing existing containers (redis, fossistant) if they exist..."
             docker rm -f redis fossistant || true
 
-            echo "🧹 Stopping containers defined by docker-compose and removing orphans..."
-            $DOCKER_COMPOSE_CMD down --remove-orphans || true
-            $DOCKER_COMPOSE_CMD rm -f || true
+            echo "🧹 Stopping old containers and removing orphans..."
+            docker compose down --remove-orphans || true
+            docker compose rm -f || true
 
-            echo "✅ Pulling latest images from Docker Hub..."
-            $DOCKER_COMPOSE_CMD pull
+            echo "✅ Pulling latest images..."
+            docker compose pull
 
-            echo "🚀 Starting new containers with Docker Compose..."
-            $DOCKER_COMPOSE_CMD up -d --build
+            echo "🚀 Starting new containers..."
+            docker compose up -d --build
 
-            echo "🎉 Deployment complete! Current containers:"
-            docker ps
+            echo "🎉 Deployment complete! Containers are up and running."
