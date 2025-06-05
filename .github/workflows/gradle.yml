@@ -49,6 +49,7 @@ jobs:
             echo "✅ pulling latest image..."
             docker compose pull
             echo "🧹 stopping old containers..."
-            docker compose down || true
+            docker compose down --remove-orphans || true
+            docker compose rm -f || true
             echo "🚀 starting new containers..."
             docker compose up -d --build
