@@ -19,6 +19,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -171,18 +172,26 @@ public class MemberServiceImpl implements MemberService {
                 .build();
     }
 
+    @Transactional
     public void updateTopLanguages(Member member, String accessToken) {
         Map<String, Long> langStats = gitHubHelperService.getUserLanguageStats(accessToken);
 
+        List<String> supported = List.of(
+                "Java","TypeScript","JavaScript","Python","Jupyter Notebook",
+                "Swift","Kotlin","Ruby","C","C++","Go",
+                "Fortran","R","PHP","Shell","Rust","HTML"
+        );
+
         List<String> top3 = langStats.entrySet().stream()
+                .filter(e -> supported.contains(e.getKey()))
                 .sorted(Map.Entry.<String, Long>comparingByValue().reversed())
                 .limit(3)
                 .map(Map.Entry::getKey)
                 .toList();
 
         member.updateTopLanguages(top3);
-        memberRepository.save(member);
 
+        memberRepository.save(member);
     }
 
 }

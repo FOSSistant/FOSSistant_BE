@@ -28,12 +28,40 @@ public class GithubRepositoryServiceImpl implements GithubRepositoryService {
 
     @Override
     public void fetchAndStoreTrendingRepositories() {
-        List<String> languages = List.of("Java", "TypeScript", "JavaScript", "Python", "Jupyter Notebook");
+        // 기존 5개에 추가 12개를 더해 총 17개
+        List<String> languages = List.of(
+                "Java",
+                "TypeScript",
+                "JavaScript",
+                "Python",
+                "Jupyter Notebook",
+                "Swift",
+                "Kotlin",
+                "Ruby",
+                "C",
+                "C++",
+                "Go",
+                "Fortran",
+                "R",
+                "PHP",
+                "Shell",
+                "Rust",
+                "HTML"
+        );
+
+        int count = 5;  // 언어당 가져올 레포 수
 
         for (String language : languages) {
-            List<GitHubRepository> trendingRepos = gitHubHelperService.fetchTrendingRepositories(language, 15);
+            List<GitHubRepository> trendingRepos =
+                    gitHubHelperService.fetchTrendingRepositories(language, count);
+
+            if (trendingRepos.isEmpty()) {
+                log.warn("[{}] 언어에 대해 트렌딩 레포를 찾지 못했습니다.", language);
+                continue;
+            }
+
             gitHubRepositoryRepository.saveAll(trendingRepos);
-            log.info("[{}] 언어에 대해 {}개의 레포지터리 저장 완료", language, trendingRepos.size());
+            log.info("[{}] 언어에 대해 {}개의 트렌딩 레포 저장 완료", language, trendingRepos.size());
         }
     }
 

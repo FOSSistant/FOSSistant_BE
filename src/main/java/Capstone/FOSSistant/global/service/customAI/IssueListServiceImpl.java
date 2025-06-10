@@ -20,17 +20,21 @@ import org.springframework.data.redis.RedisConnectionFailureException;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.stereotype.Service;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
+import reactor.core.publisher.Mono;
 
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeoutException;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional
 public class IssueListServiceImpl implements IssueListService {
+    private static final double SCORE_THRESHOLD = 0.4;
 
     private final IssueListRepository issueListRepository;
     private final StringRedisTemplate redisTemplate;
@@ -192,19 +196,40 @@ public class IssueListServiceImpl implements IssueListService {
     public CompletableFuture<Tag> classifyWithAI(String title, String body) {
         long start = System.currentTimeMillis();
 
-        // (1) WebClient 논블로킹 호출 → Mono<String> → toFuture() → CompletableFuture<String>
-        CompletableFuture<String> monoFuture = aiClassifierClient.classify(title, body)
+        return aiClassifierClient.classify(title, body)
                 .timeout(Duration.ofSeconds(20))
-                // 에러 시 기본 JSON 반환
-                .onErrorResume(e -> aiClassifierClient.defaultSingleResult())
-                .toFuture();
-
-        // (2) JSON 파싱 → Tag로 변환하여 리턴
-        return monoFuture.thenApplyAsync(jsonResult -> {
-            long end = System.currentTimeMillis();
-            log.info("[AI 분류 소요 시간] {}ms", (end - start));
-            return parseJsonToTag(jsonResult);
-        }, classifierExecutor);
+                // 1) 네트워크/타임아웃 에러
+                .onErrorResume(TimeoutException.class, e -> {
+                    log.error("[{}] AI 호출 타임아웃 ({}ms) — issue: {}",
+                            "NETWORK", System.currentTimeMillis() - start, title, e);
+                    // fallback JSON
+                    return aiClassifierClient.defaultSingleResult();
+                })
+                .onErrorResume(WebClientResponseException.class, e -> {
+                    log.error("[{}] AI HTTP 에러: {} {} — issue: {}",
+                            "HTTP", e.getRawStatusCode(), e.getStatusText(), title, e);
+                    return aiClassifierClient.defaultSingleResult();
+                })
+                .onErrorResume(e -> {
+                    log.error("[{}] AI 호출 예외: {} — issue: {}",
+                            "UNKNOWN_CALL", e.getMessage(), title, e);
+                    return aiClassifierClient.defaultSingleResult();
+                })
+                .toFuture()
+                .thenApplyAsync(jsonResult -> {
+                    try {
+                        // 2) JSON 파싱
+                        Tag tag = parseJsonToTag(jsonResult);
+                        log.info("[{}] 분류 완료: {} ({}ms) — issue: {}",
+                                "SUCCESS", tag, System.currentTimeMillis() - start, title);
+                        return tag;
+                    } catch (Exception parseEx) {
+                        // 3) 파싱 오류
+                        log.error("[{}] AI 응답 파싱 실패 ({}ms) — issue: {}, json={}",
+                                "PARSE_ERROR", System.currentTimeMillis() - start, title, jsonResult, parseEx);
+                        return Tag.UNKNOWN;
+                    }
+                }, classifierExecutor);
     }
 
     /**
@@ -273,21 +298,38 @@ public class IssueListServiceImpl implements IssueListService {
 
     private Tag parseJsonToTag(String json) {
         try {
-            ObjectMapper objectMapper = new ObjectMapper();
-            JsonNode root = objectMapper.readTree(json).get("results");
-            if (root != null && root.isArray() && root.size() > 0) {
-                String diff = root.get(0).get("difficulty").asText("misc").toLowerCase();
+            JsonNode results = new ObjectMapper()
+                    .readTree(json)
+                    .get("results");
+
+            if (results != null && results.isArray() && results.size() > 0) {
+                JsonNode first = results.get(0);
+                String diff = first.get("difficulty").asText("misc").toLowerCase();
+                double score = first.has("score")
+                        ? first.get("score").asDouble()
+                        : 1.0;  // score 필드가 없으면 기본 1.0
+
+                // 1) misc는 모델이 예측하지 않기로 한 케이스
+                if ("misc".equals(diff)) {
+                    return Tag.MISC;
+                }
+                // 2) score가 임계치 미만이면 확신 부족으로 UNKNOWN
+                if (score < SCORE_THRESHOLD) {
+                    return Tag.UNKNOWN;
+                }
+                // 3) 그 외 easy/medium/hard 대로 반환
                 return switch (diff) {
                     case "easy" -> Tag.EASY;
                     case "medium" -> Tag.MEDIUM;
                     case "hard" -> Tag.HARD;
-                    default -> Tag.MISC;
+                    default -> Tag.MISC;  // safety
                 };
             }
         } catch (Exception e) {
-            log.error("AI 응답 파싱 실패 - result: {}", json, e);
+            log.error("AI 응답 파싱 실패: {}", e.getMessage(), e);
         }
-        return Tag.MISC;
+        // 파싱 오류 시에도 UNKNOWN (예측은 했지만 올바른 결과가 아님)
+        return Tag.UNKNOWN;
     }
 
     private static class IssueClassificationResult {

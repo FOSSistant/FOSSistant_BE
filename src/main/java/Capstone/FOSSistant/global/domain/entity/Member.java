@@ -41,6 +41,7 @@ public class Member extends BaseEntity {
     @OneToMany(mappedBy = "member", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<IssueFeedback> feedbackList = new ArrayList<>();
 
+    @Builder.Default
     @OneToMany(mappedBy = "member", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<MemberTopLanguage> topLanguages = new ArrayList<>();
 
@@ -52,12 +53,18 @@ public class Member extends BaseEntity {
     }
 
     public void updateTopLanguages(List<String> newLanguages) {
-        this.topLanguages.clear();
+        if (this.topLanguages == null) {
+            this.topLanguages = new ArrayList<>();
+        } else {
+            this.topLanguages.clear();
+        }
         for (String lang : newLanguages) {
-            this.topLanguages.add(MemberTopLanguage.builder()
-                    .member(this)
-                    .language(lang)
-                    .build());
+            this.topLanguages.add(
+                    MemberTopLanguage.builder()
+                            .member(this)
+                            .language(lang)
+                            .build()
+            );
         }
     }
 
@@ -65,4 +72,5 @@ public class Member extends BaseEntity {
     public void updateLevel(Level newLevel) {
         this.level = newLevel;
     }
+
 }
