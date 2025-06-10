@@ -22,5 +22,6 @@ public class IssueListResponseDTO {
     public static class IssueResponseDTO {
         private String issueId;
         private String difficulty;
+        private Double score;
     }
 }

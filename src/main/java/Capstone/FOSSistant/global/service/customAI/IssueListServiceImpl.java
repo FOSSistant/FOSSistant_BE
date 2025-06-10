@@ -34,6 +34,8 @@ import java.util.concurrent.TimeoutException;
 @RequiredArgsConstructor
 @Transactional
 public class IssueListServiceImpl implements IssueListService {
+    public record DifficultyResult(Tag tag, double score) {}
+
     private static final double SCORE_THRESHOLD = 0.4;
 
     private final IssueListRepository issueListRepository;
@@ -78,23 +80,34 @@ public class IssueListServiceImpl implements IssueListService {
         // 1) Redis 캐시 및 DB 검사
         for (int i = 0; i < batch.size(); i++) {
             IssueListRequestDTO.IssueRequestDTO dto = batch.get(i);
-            String key = "issue:" + dto.getIssueId();
+            String issueId = dto.getIssueId();
+            String key = "issue:" + issueId;
             String cached = redisTemplate.opsForValue().get(key);
             if (cached != null) {
                 Tag tag = Tag.valueOf(cached.toUpperCase());
                 // 즉시 completedFuture 리턴
                 futures.add(
                         CompletableFuture.completedFuture(
-                                issueListConverter.toResponseDTO(dto.getIssueId(), tag)
+                                IssueListResponseDTO.IssueResponseDTO.builder()
+                                        .issueId(issueId)
+                                        .difficulty(tag.toLowerCase())
+                                        .score(1.0)
+                                        .build()
                         )
                 );
                 continue;
             }
             // DB 체크
-            IssueList existingIssue = issueListRepository.findById(dto.getIssueId()).orElse(null);
+            IssueList existingIssue = issueListRepository.findById(issueId).orElse(null);
             if (existingIssue != null) {
+                Tag tag = existingIssue.getDifficulty();
                 futures.add(CompletableFuture.completedFuture(
-                        issueListConverter.toResponseDTO(dto.getIssueId(), existingIssue.getDifficulty())));
+                        IssueListResponseDTO.IssueResponseDTO.builder()
+                                .issueId(issueId)
+                                .difficulty(tag.toLowerCase())
+                                .score(1.0)
+                                .build()
+                ));
                 continue;
             }
             toClassify.add(dto);
@@ -107,32 +120,33 @@ public class IssueListServiceImpl implements IssueListService {
             List<CompletableFuture<IssueClassificationResult>> classificationFutures = new ArrayList<>();
 
             for (IssueListRequestDTO.IssueRequestDTO dto : toClassify) {
+                String issueId = dto.getIssueId();
+                String key = "issue:" + issueId;
                 // GitHub API 호출 (제목/본문)
                 CompletableFuture<String[]> gitHubFuture = CompletableFuture.supplyAsync(
-                        () -> extractTitleAndBody(dto.getIssueId()),
+                        () -> extractTitleAndBody(issueId),
                         classifierExecutor
                 );
 
                 // GitHub 결과를 받은 뒤 AI 분류
-                CompletableFuture<Tag> aiFuture = gitHubFuture.thenComposeAsync(parts -> {
-                    String title = parts[0];
-                    String body = parts[1];
-                    return classifyWithAI(title, body);
-                }, classifierExecutor);
+                CompletableFuture<DifficultyResult> diffFuture = gitHubFuture
+                        .thenComposeAsync(parts -> classifyWithAI(parts[0], parts[1]), classifierExecutor);
 
-                // AI 분류 결과를 받은 뒤 캐시 저장/DB 저장 + DTO 변환
-                CompletableFuture<IssueClassificationResult> resultFuture = aiFuture.thenApplyAsync(tag -> {
-                    // 캐시 저장
-                    String key = "issue:" + dto.getIssueId();
-                    cacheDifficulty(key, tag);
-                    // DB 저장
-                    persistDifficulty(dto, tag);
-                    // 응답 DTO 생성
-                    IssueListResponseDTO.IssueResponseDTO responseDTO =
-                            issueListConverter.toResponseDTO(dto.getIssueId(), tag);
+                CompletableFuture<IssueClassificationResult> resultFuture = diffFuture
+                        .thenApplyAsync(diffRes -> {
+                            // 캐시/DB 저장
+                            cacheDifficulty(key, diffRes.tag());
+                            persistDifficulty(dto, diffRes.tag());
 
-                    return new IssueClassificationResult(dto.getIssueId(), responseDTO);
-                }, classifierExecutor);
+                            // score 포함 DTO 생성
+                            IssueListResponseDTO.IssueResponseDTO responseDTO =
+                                    IssueListResponseDTO.IssueResponseDTO.builder()
+                                            .issueId(issueId)
+                                            .difficulty(diffRes.tag().toLowerCase())
+                                            .score(diffRes.score())
+                                            .build();
+                            return new IssueClassificationResult(issueId, responseDTO);
+                        }, classifierExecutor);
 
                 classificationFutures.add(resultFuture);
             }
@@ -162,7 +176,12 @@ public class IssueListServiceImpl implements IssueListService {
                                 }
                             }
                             // 실패 시 기본값 반환
-                            return issueListConverter.toResponseDTO(toClassify.get(finalIdx).getIssueId(), Tag.MISC);
+                            String issueId = toClassify.get(finalIdx).getIssueId();
+                            return IssueListResponseDTO.IssueResponseDTO.builder()
+                                    .issueId(issueId)
+                                    .difficulty(Tag.MISC.toLowerCase())
+                                    .score(1.0)
+                                    .build();
                         }, classifierExecutor);
 
                 futures.add(batchIndex, wrapperFuture);
@@ -193,41 +212,48 @@ public class IssueListServiceImpl implements IssueListService {
      * AI 서버에 단건 분류 요청을 보내고, JSON 문자열을 Tag로 파싱하여 CompletableFuture<Tag>로 반환합니다.
      * 내부적으로 WebClient Mono → toFuture()로 변환되며, 파싱 단계는 classifierExecutor에서 실행됩니다.
      */
-    public CompletableFuture<Tag> classifyWithAI(String title, String body) {
+    public CompletableFuture<DifficultyResult> classifyWithAI(String title, String body) {
         long start = System.currentTimeMillis();
 
         return aiClassifierClient.classify(title, body)
-                .timeout(Duration.ofSeconds(20))
-                // 1) 네트워크/타임아웃 에러
+                .timeout(Duration.ofSeconds(30))
                 .onErrorResume(TimeoutException.class, e -> {
-                    log.error("[{}] AI 호출 타임아웃 ({}ms) — issue: {}",
-                            "NETWORK", System.currentTimeMillis() - start, title, e);
-                    // fallback JSON
+                    log.error("[NETWORK] AI 호출 타임아웃: {}ms — {}", System.currentTimeMillis()-start, title, e);
                     return aiClassifierClient.defaultSingleResult();
                 })
                 .onErrorResume(WebClientResponseException.class, e -> {
-                    log.error("[{}] AI HTTP 에러: {} {} — issue: {}",
-                            "HTTP", e.getRawStatusCode(), e.getStatusText(), title, e);
+                    log.error("[HTTP] AI HTTP 에러 {} {} — {}", e.getRawStatusCode(), e.getStatusText(), title, e);
                     return aiClassifierClient.defaultSingleResult();
                 })
                 .onErrorResume(e -> {
-                    log.error("[{}] AI 호출 예외: {} — issue: {}",
-                            "UNKNOWN_CALL", e.getMessage(), title, e);
+                    log.error("[UNKNOWN_CALL] AI 호출 예외 — {}", title, e);
                     return aiClassifierClient.defaultSingleResult();
                 })
                 .toFuture()
                 .thenApplyAsync(jsonResult -> {
                     try {
-                        // 2) JSON 파싱
-                        Tag tag = parseJsonToTag(jsonResult);
-                        log.info("[{}] 분류 완료: {} ({}ms) — issue: {}",
-                                "SUCCESS", tag, System.currentTimeMillis() - start, title);
-                        return tag;
-                    } catch (Exception parseEx) {
-                        // 3) 파싱 오류
-                        log.error("[{}] AI 응답 파싱 실패 ({}ms) — issue: {}, json={}",
-                                "PARSE_ERROR", System.currentTimeMillis() - start, title, jsonResult, parseEx);
-                        return Tag.UNKNOWN;
+                        JsonNode first = new ObjectMapper()
+                                .readTree(jsonResult)
+                                .get("results")
+                                .get(0);
+
+                        String diff  = first.get("difficulty").asText("misc").toLowerCase();
+                        double score = first.get("score").asDouble(0.0);
+
+                        Tag tag = switch (diff) {
+                            case "easy"   -> Tag.EASY;
+                            case "medium" -> Tag.MEDIUM;
+                            case "hard"   -> Tag.HARD;
+                            case "misc"   -> Tag.MISC;
+                            default       -> Tag.UNKNOWN;
+                        };
+
+                        log.info("[SUCCESS] {} → {} (score={}) {}ms", title, tag, score, System.currentTimeMillis()-start);
+                        return new DifficultyResult(tag, score);
+
+                    } catch (Exception ex) {
+                        log.error("[PARSE_ERROR] AI 응답 파싱 실패 — {}", title, ex);
+                        return new DifficultyResult(Tag.UNKNOWN, 0.0);
                     }
                 }, classifierExecutor);
     }
@@ -345,36 +371,54 @@ public class IssueListServiceImpl implements IssueListService {
     /**
      * 단건 분류 요청 (캐시/DB/AI 순)
      */
-    public CompletableFuture<IssueListResponseDTO.IssueResponseDTO> classify(IssueListRequestDTO.IssueRequestDTO dto) {
-        String key = "issue:" + dto.getIssueId();
-        return CompletableFuture.supplyAsync(() -> {
-            // DB 우선 체크
-            IssueList existing = issueListRepository.findById(dto.getIssueId()).orElse(null);
-            if (existing != null) {
-                return "DB:" + existing.getDifficulty().name().toLowerCase();
-            }
-            String redisCached = redisTemplate.opsForValue().get(key);
-            return redisCached != null ? "REDIS:" + redisCached : null;
-        }, classifierExecutor).thenCompose(source -> {
-            if (source != null) {
-                if (source.startsWith("DB:")) {
-                    Tag tag = Tag.valueOf(source.substring(3).toUpperCase());
-                    return CompletableFuture.completedFuture(issueListConverter.toResponseDTO(dto.getIssueId(), tag));
-                } else { // REDIS case
-                    Tag tag = Tag.valueOf(source.substring(6).toUpperCase());
-                    return CompletableFuture.completedFuture(issueListConverter.toResponseDTO(dto.getIssueId(), tag));
-                }
-            }
-            // GitHub fetch + AI classify
-            CompletableFuture<Tag> tagFuture = CompletableFuture.supplyAsync(
-                    () -> extractTitleAndBody(dto.getIssueId()), classifierExecutor
-            ).thenComposeAsync(parts -> classifyWithAI(parts[0], parts[1]), classifierExecutor);
-
-            return tagFuture.thenApplyAsync(tag -> {
-                cacheDifficulty(key, tag);
-                persistDifficulty(dto, tag);
-                return issueListConverter.toResponseDTO(dto.getIssueId(), tag);
-            }, classifierExecutor);
-        });
-    }
+//    public CompletableFuture<IssueListResponseDTO.IssueResponseDTO> classify(IssueListRequestDTO.IssueRequestDTO dto) {
+//        String issueId = dto.getIssueId();
+//        String key = "issue:" + issueId;
+//        return CompletableFuture.supplyAsync(() -> {
+//            // DB 우선 체크
+//            IssueList existing = issueListRepository.findById(issueId).orElse(null);
+//            if (existing != null) {
+//                Tag tag = existing.getDifficulty();
+//                return "DB:" + tag.name().toLowerCase();
+//            }
+//            String redisCached = redisTemplate.opsForValue().get(key);
+//            return redisCached != null ? "REDIS:" + redisCached : null;
+//        }, classifierExecutor).thenCompose(source -> {
+//            if (source != null) {
+//                if (source.startsWith("DB:")) {
+//                    Tag tag = Tag.valueOf(source.substring(3).toUpperCase());
+//                    return CompletableFuture.completedFuture(
+//                            IssueListResponseDTO.IssueResponseDTO.builder()
+//                                    .issueId(issueId)
+//                                    .difficulty(tag.toLowerCase())
+//                                    .score(1.0)
+//                                    .build()
+//                    );
+//                } else { // REDIS case
+//                    Tag tag = Tag.valueOf(source.substring(6).toUpperCase());
+//                    return CompletableFuture.completedFuture(
+//                            IssueListResponseDTO.IssueResponseDTO.builder()
+//                                    .issueId(issueId)
+//                                    .difficulty(tag.toLowerCase())
+//                                    .score(1.0)
+//                                    .build()
+//                    );
+//                }
+//            }
+//            // GitHub fetch + AI classify
+//            CompletableFuture<DifficultyResult> diffFuture = CompletableFuture.supplyAsync(
+//                    () -> extractTitleAndBody(issueId), classifierExecutor
+//            ).thenComposeAsync(parts -> classifyWithAI(parts[0], parts[1]), classifierExecutor);
+//
+//            return diffFuture.thenApplyAsync(diffRes -> {
+//                cacheDifficulty(key, diffRes.tag());
+//                persistDifficulty(dto, diffRes.tag());
+//                return IssueListResponseDTO.IssueResponseDTO.builder()
+//                        .issueId(issueId)
+//                        .difficulty(diffRes.tag().toLowerCase())
+//                        .score(diffRes.score())
+//                        .build();
+//            }, classifierExecutor);
+//        });
+//    }
 }

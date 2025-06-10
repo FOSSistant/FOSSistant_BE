@@ -147,8 +147,16 @@ public class IssueDetailService {
         }
 
         // 2) 미분류 상태면 AI 분류 서비스로 태그 결정 (비동기)
+
         return issueListService.classifyWithAI(title, body)
-                .thenApplyAsync(tag -> saveDetail(issueId, title, tag, gemini, relatedLinks),
+                .thenApplyAsync(diffRes ->
+                                saveDetail(
+                                        issueId,
+                                        title,
+                                        diffRes.tag(),      // 태그는 .tag()
+                                        gemini,
+                                        relatedLinks
+                                ),
                         classifierExecutor);
     }
 
