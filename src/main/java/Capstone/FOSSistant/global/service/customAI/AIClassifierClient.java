@@ -106,7 +106,7 @@ public class AIClassifierClient {
                 .bodyValue(payload)
                 .retrieve()
                 .bodyToMono(String.class)
-                .timeout(Duration.ofSeconds(50))
+                .timeout(Duration.ofSeconds(60))
                 .doOnSuccess( result -> {
                     long end = System.currentTimeMillis();
                     log.info("[AI Batch API 호출 + 응답 수신 시간] {}ms", (end - start));

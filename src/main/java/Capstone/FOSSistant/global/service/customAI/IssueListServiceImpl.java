@@ -216,7 +216,7 @@ public class IssueListServiceImpl implements IssueListService {
         long start = System.currentTimeMillis();
 
         return aiClassifierClient.classify(title, body)
-                .timeout(Duration.ofSeconds(50))
+                .timeout(Duration.ofSeconds(60))
                 .onErrorResume(TimeoutException.class, e -> {
                     log.error("[NETWORK] AI 호출 타임아웃: {}ms — {}", System.currentTimeMillis()-start, title, e);
                     return aiClassifierClient.defaultSingleResult();
@@ -264,7 +264,7 @@ public class IssueListServiceImpl implements IssueListService {
     private CompletableFuture<List<Tag>> classifyWithAIBatch(List<String[]> titleBodyList) {
         // (1) WebClient 논블로킹 배치 호출 → Mono<String> → toFuture() → CompletableFuture<String>
         CompletableFuture<String> monoFuture = aiClassifierClient.classifyBatch(titleBodyList)
-                .timeout(Duration.ofSeconds(30))
+                .timeout(Duration.ofSeconds(60))
                 // 에러 시 기본 JSON 반환
                 .onErrorResume(e -> aiClassifierClient.defaultBatchResult())
                 .toFuture();
