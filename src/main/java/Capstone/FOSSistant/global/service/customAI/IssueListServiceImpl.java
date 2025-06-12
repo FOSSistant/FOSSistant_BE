@@ -216,7 +216,7 @@ public class IssueListServiceImpl implements IssueListService {
         long start = System.currentTimeMillis();
 
         return aiClassifierClient.classify(title, body)
-                .timeout(Duration.ofSeconds(30))
+                .timeout(Duration.ofSeconds(50))
                 .onErrorResume(TimeoutException.class, e -> {
                     log.error("[NETWORK] AI 호출 타임아웃: {}ms — {}", System.currentTimeMillis()-start, title, e);
                     return aiClassifierClient.defaultSingleResult();
